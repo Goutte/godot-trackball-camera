@@ -7,6 +7,10 @@ extends Camera
 
 # todo: test if touch works on android and html5, try SCREEN_DRAG otherwise
 
+# Requirements
+# ------------
+# Godot 3.x
+
 # Usage
 # -----
 # Attach as script to a Camera, and make the camera a child of the node to trackball around.
@@ -43,8 +47,6 @@ export var inertiaStrength		= 1.0	# multiplier applied to all strengths
 export(float, 0, 1, 0.005) var friction	= 0.07
 
 
-const TAU = 6.2831853	# circle constant
-
 
 var _iKnowWhatIAmDoing = false	# should we skip assertions?
 var _cameraUp = Vector3(0, 1, 0)
@@ -62,14 +64,14 @@ func _ready():
 	# It's best to catch future divisions by 0 before they happen.
 	# Note that we don't need this check if the mouse support is disabled.
 	# In case you know what you're doing, there's a property you can change.
-	assert _iKnowWhatIAmDoing or get_viewport().get_rect().get_area() > 0
-	#print("Trackball camera around %s is ready. ♥" % get_parent().get_name())
+	assert _iKnowWhatIAmDoing or get_viewport().get_visible_rect().get_area()
+	#print("Trackball Camera around %s is ready. ♥" % get_parent().get_name())
 
 
 func _input(ev):
-	if mouseEnabled and ev.type == InputEvent.MOUSE_BUTTON:
+	if mouseEnabled and ev is InputEventMouseButton:
 		if ev.pressed:
-			_mouseDragStart = getMousePosition()
+			_mouseDragStart = getNormalizedMousePosition()
 		else:
 			_mouseDragStart = null
 		_mouseDragPosition = _mouseDragStart
@@ -77,11 +79,11 @@ func _input(ev):
 
 func _process(delta):
 	if mouseEnabled and _mouseDragPosition != null:
-		var _currentDragPosition = getMousePosition()
+		var _currentDragPosition = getNormalizedMousePosition()
 		_dragInertia += (_currentDragPosition - _mouseDragPosition) \
 						* mouseStrength * (-0.1 if mouseInvert else 0.1)
 		_mouseDragPosition = _currentDragPosition
-	
+
 	if keyboardEnabled:
 		var key_i = -1 if keyboardInvert else 1
 		var key_s = keyboardStrength / 1000.0	# exported floats get truncated
@@ -93,7 +95,7 @@ func _process(delta):
 			_dragInertia += Vector2(0, key_i * key_s)
 		if Input.is_key_pressed(KEY_DOWN):
 			_dragInertia += Vector2(0, -1 * key_i * key_s)
-	
+
 	if joystickEnabled:
 		var joy_h = Input.get_joy_axis(joystickDevice, 0)	# left stick horizontal
 		var joy_v = Input.get_joy_axis(joystickDevice, 1)	# left stick vertical
@@ -120,14 +122,14 @@ func addInertia(inertia):
 	_dragInertia += inertia
 
 
-func getMousePosition():
-	return get_viewport().get_mouse_pos() / get_viewport().get_rect().size
+func getNormalizedMousePosition():
+	return get_viewport().get_mouse_position() / get_viewport().get_visible_rect().size
 
 
 func applyRotationFromTangent(tangent):
-	var tr = get_transform()  # not get_camera_transform, important
+	var tr = get_transform()  # not get_camera_transform, unsure why
 	var up = tr.basis.xform(_cameraUp)
 	var rg = tr.basis.xform(_cameraRight)
-	var upQuat = Quat(up, tangent.x * TAU)
-	var rgQuat = Quat(rg, tangent.y * TAU)
+	var upQuat = Quat(up, -1 * tangent.x * TAU)
+	var rgQuat = Quat(rg, -1 * tangent.y * TAU)
 	set_transform(Transform(upQuat * rgQuat) * tr)	# money shot!
