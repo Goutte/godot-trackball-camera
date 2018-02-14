@@ -6,10 +6,11 @@ TrackballCamera for Godot
 [![Release](https://img.shields.io/github/release/Goutte/godot-trackball-camera.svg)](https://github.com/Goutte/godot-trackball-camera/releases)
 [![Donate](https://img.shields.io/badge/%CE%9E-%E2%99%A5-blue.svg)](https://etherscan.io/address/0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498)
 
-
-A simple [Godot](https://godotengine.org/) `2.1` and `3.x` addon that adds a `TrackballCamera` without gimbal lock.
+A simple [Godot](https://godotengine.org/) `3.x` addon that adds a `TrackballCamera` without gimbal lock.
 
 The `TrackballCamera` responds to input from mouse, keyboard, joystick and touch, in order to rotate around its parent node while facing it.
+
+A version for Godot `2.x` [is available as well](https://github.com/Goutte/godot-trackball-camera/releases/tag/v1.0).
 
 
 Features
@@ -25,14 +26,10 @@ Features
 Install
 -------
 
-The installation is as usual : copy this project as a subdirectory of your `addons/` directory.
+The installation is as usual, through the Assets Lib.
+Then, enable the plugin in `Scene > Project Settings > Plugins`.
 
-```
-cd <myproject>/addons
-git clone https://github.com/Goutte/godot-trackball-camera trackball_camera
-```
-
-Then, enable the plugin in `Scene > Project Settins > Plugins`.
+You can also simply copy the files of this project into yours, it should work.
 
 
 Usage
@@ -51,7 +48,6 @@ Todo
 ----
 
 - [ ] Test if touch works on android and html5, try `SCREEN_DRAG` otherwise.
-- [ ] Update to Godot `3.0` upon release
 
 
 Feedback and contributions are welcome!
