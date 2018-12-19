@@ -6,6 +6,7 @@ extends Camera
 # The camera has inertia for a smoother experience.
 
 # todo: test if touch works on android and html5, try SCREEN_DRAG otherwise
+# todo: zoom in and out (you do it! do share the code)
 
 # Requirements
 # ------------
@@ -25,25 +26,26 @@ extends Camera
 # -------
 # Same as Godot, ie. permissive MIT. (https://godotengine.org/license)
 
-# If you feel generous and want to feed me so I can math more of those,
-# I enjoy the taste of ETH Ξ 0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498
-# You can blame antoine@goutenoir.com for the bugs, crashes and burns.
-# Seriously, useful feedback is always appreciated – we can't test everything.
+# Authors
+# -------
+# - Ξ 0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498
 
 
-
-export var mouseEnabled			= true
-export var mouseInvert			= false
-export var mouseStrength		= 1.111
-export var keyboardEnabled		= true
-export var keyboardInvert		= false
-export var keyboardStrength		= 1.111
-export var joystickEnabled		= true
-export var joystickInvert		= false
-export var joystickStrength		= 1.111
-export var joystickThreshold	= 0.09	# the resting state of my joystick's x-axis is -0.05 T.T
-export var joystickDevice		= 0
-export var inertiaStrength		= 1.0	# multiplier applied to all strengths
+export var mouseEnabled = true
+export var mouseInvert = false
+export var mouseStrength = 1.111
+export var keyboardEnabled = true
+export var keyboardInvert = false
+export var keyboardStrength = 1.111
+export var joystickEnabled = true
+export var joystickInvert = false
+export var joystickStrength = 1.111
+# The resting state of my joystick's x-axis is -0.05,
+# so we want to ignore any input below this threshold.
+export var joystickThreshold = 0.09
+export var joystickDevice = 0
+# Multiplier applied to all strengths
+export var inertiaStrength = 1.0
 export(float, 0, 1, 0.005) var friction	= 0.07
 
 
