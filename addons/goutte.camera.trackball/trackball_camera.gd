@@ -3,10 +3,11 @@ extends Camera
 # Makes this Camera respond to input from mouse, keyboard, joystick and touch,
 # in order to rotate around its parent node while facing it.
 # We're using quaternions, so no infamous gimbal lock.
-# The camera has inertia for a smoother experience.
+# The camera has (opt-out) inertia for a smoother experience.
 
 # todo: test if touch works on android and html5, try SCREEN_DRAG otherwise
 # todo: zoom in and out (you do it! do share the code)
+# todo: use Actions instead of Inputs
 
 # Requirements
 # ------------
@@ -30,7 +31,6 @@ extends Camera
 # -------
 # - Ξ 0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498
 
-
 export var mouseEnabled = true
 export var mouseInvert = false
 export var mouseStrength = 1.111
@@ -46,9 +46,8 @@ export var joystickThreshold = 0.09
 export var joystickDevice = 0
 # Multiplier applied to all strengths
 export var inertiaStrength = 1.0
-export(float, 0, 1, 0.005) var friction	= 0.07
-
-
+# Fraction of inertia lost on each frame
+export(float, 0, 1, 0.005) var friction = 0.07
 
 var _iKnowWhatIAmDoing = false	# should we skip assertions?
 var _cameraUp = Vector3(0, 1, 0)
@@ -66,7 +65,7 @@ func _ready():
 	# It's best to catch future divisions by 0 before they happen.
 	# Note that we don't need this check if the mouse support is disabled.
 	# In case you know what you're doing, there's a property you can change.
-	assert _iKnowWhatIAmDoing or get_viewport().get_visible_rect().get_area()
+	assert(_iKnowWhatIAmDoing or get_viewport().get_visible_rect().get_area())
 	#print("Trackball Camera around %s is ready. ♥" % get_parent().get_name())
 
 
@@ -130,8 +129,14 @@ func getNormalizedMousePosition():
 
 func applyRotationFromTangent(tangent):
 	var tr = get_transform()  # not get_camera_transform, unsure why
-	var up = tr.basis.xform(_cameraUp)
-	var rg = tr.basis.xform(_cameraRight)
+	var up = tr.basis.xform(_cameraUp).normalized()
+	var rg = tr.basis.xform(_cameraRight).normalized()
 	var upQuat = Quat(up, -1 * tangent.x * TAU)
 	var rgQuat = Quat(rg, -1 * tangent.y * TAU)
-	set_transform(Transform(upQuat * rgQuat) * tr)	# money shot!
+	set_transform(Transform(upQuat * rgQuat) * tr)	# :]
+
+# That's all folks!
+# No-one donated to this project, but...
+# It made me discover quaternion fractals.
+# ...
+# Worth it.
