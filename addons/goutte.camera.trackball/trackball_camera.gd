@@ -7,15 +7,17 @@ extends Camera
 
 # todo: test if touch works on android and html5, try SCREEN_DRAG otherwise
 # todo: zoom in and out (you do it! do share the code)
-# todo: use Actions instead of Inputs
 
 # Requirements
 # ------------
-# Godot 3.x
+# Godot `3.1.x` or Godot `3.2.x`.
+# Not tested with Godot `4.x`.
 
 # Usage
 # -----
-# Attach as script to a Camera, and make the camera a child of the node to trackball around.
+# 1. Attach this script to a Camera (or use plugin's TrackballCamera)
+# 2. Move Camera as child of the Node to trackball around
+# 3. Make sure your Camera looks at that Node
 # Make sure your camera initially faces said node, and is at a proper distance from it.
 # The initial position of your camera matters. The node does not need to be in the center.
 
@@ -34,7 +36,7 @@ extends Camera
 export var mouseEnabled = true
 export var mouseInvert = false
 export var mouseStrength = 1.111
-export var keyboardEnabled = true
+export var keyboardEnabled = false
 export var keyboardInvert = false
 export var keyboardStrength = 1.111
 export var joystickEnabled = true
@@ -44,7 +46,16 @@ export var joystickStrength = 1.111
 # so we want to ignore any input below this threshold.
 export var joystickThreshold = 0.09
 export var joystickDevice = 0
-# Multiplier applied to all strengths
+# Use the project's Actions
+export var actionEnabled = true
+export var actionInvert = false
+export var actionUp = 'ui_up'
+export var actionDown = 'ui_down'
+export var actionRight = 'ui_right'
+export var actionLeft = 'ui_left'
+export var actionStrength = 1.111
+
+# Multiplier applied to all inputs
 export var inertiaStrength = 1.0
 # Fraction of inertia lost on each frame
 export(float, 0, 1, 0.005) var friction = 0.07
@@ -101,13 +112,26 @@ func _process(delta):
 		var joy_h = Input.get_joy_axis(joystickDevice, 0)	# left stick horizontal
 		var joy_v = Input.get_joy_axis(joystickDevice, 1)	# left stick vertical
 		var joy_i = -1 if joystickInvert else 1
-		var joy_s = joystickStrength / 1000.0	# exported floats get truncated
+		var joy_s = joystickStrength / 1000.0	# exported floats are truncated
 
 		if abs(joy_h) > joystickThreshold:
 			_dragInertia += Vector2(joy_i * joy_h * joy_h * sign(joy_h) * joy_s, 0)
 		if abs(joy_v) > joystickThreshold:
 			_dragInertia += Vector2(0, joy_i * joy_v * joy_v * sign(joy_v) * joy_s)
-
+	
+	if actionEnabled:
+		# Exported floats are truncated, so we divide it here
+		var act_s = actionStrength / 1000.0
+		var act_i = -1 if actionInvert else 1
+		if Input.is_action_pressed(actionUp):
+			addInertia(Vector2(0, act_i * act_s))
+		if Input.is_action_pressed(actionDown):
+			addInertia(Vector2(0, -1 * act_i * act_s))
+		if Input.is_action_pressed(actionLeft):
+			addInertia(Vector2(act_i * act_s, 0))
+		if Input.is_action_pressed(actionRight):
+			addInertia(Vector2(-1 * act_i * act_s, 0))
+	
 	var inertia = _dragInertia.length()
 	if inertia > _epsilon:
 		applyRotationFromTangent(_dragInertia * inertiaStrength)
@@ -120,6 +144,11 @@ func _process(delta):
 # Convenience method for you to move the camera around.
 # inertia is a Vector2 in the normalized right-handed x/y of the screen.
 func addInertia(inertia):
+	"""
+	Move the camera around.
+	inertia:
+		a Vector2 in the normalized right-handed x/y of the screen.
+	"""
 	_dragInertia += inertia
 
 
@@ -136,7 +165,7 @@ func applyRotationFromTangent(tangent):
 	set_transform(Transform(upQuat * rgQuat) * tr)	# :]
 
 # That's all folks!
-# No-one donated to this project, but...
-# It made me discover quaternion fractals.
+# No-one else contributed to this project, but...
+# It helped me discover quaternion fractals.
 # ...
 # Worth it.
