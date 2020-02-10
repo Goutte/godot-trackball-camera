@@ -6,7 +6,7 @@ extends Camera
 # The camera has (opt-out) inertia for a smoother experience.
 
 # todo: test if touch works on android and html5, try SCREEN_DRAG otherwise
-# todo: zoom in and out (you do it! do share the code)
+# todo: move to snake_case API to conform with guidelines
 
 # Requirements
 # ------------
@@ -61,6 +61,8 @@ export var zoomInvert = false
 export var zoomStrength = 1.111
 # There is no default Godot action using mousewheel, so
 # you should make your own actions and use them here.
+# We're using `action_just_released` to catch mousewheels,
+# which makes it a bit awkward for key presses.
 export var actionZoomIn = 'ui_page_up'
 export var actionZoomOut = 'ui_page_down'
 
@@ -144,11 +146,11 @@ func _process(delta):
 			addInertia(Vector2(act_i * act_s * -1, 0))
 	
 	if zoomEnabled:
-		var zoo_s = zoomStrength / 1000.0
+		var zoo_s = zoomStrength / 20.0
 		var zoo_i = -1 if zoomInvert else 1
-		if Input.is_action_pressed(actionZoomIn):
+		if Input.is_action_just_released(actionZoomIn):
 			addZoomInertia(zoo_i * zoo_s)
-		if Input.is_action_pressed(actionZoomOut):
+		if Input.is_action_just_released(actionZoomOut):
 			addZoomInertia(zoo_i * zoo_s * -1)
 	
 	var inertia = _dragInertia.length()
@@ -196,7 +198,7 @@ func applyRotationFromTangent(tangent):
 	var rg = tr.basis.xform(_cameraRight).normalized()
 	var upQuat = Quat(up, -1 * tangent.x * TAU)
 	var rgQuat = Quat(rg, -1 * tangent.y * TAU)
-	set_transform(Transform(upQuat * rgQuat) * tr)	# ;)
+	set_transform(Transform(upQuat * rgQuat) * tr)	# ;p
 
 
 # That's all folks!
