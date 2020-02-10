@@ -15,10 +15,10 @@ extends Camera
 
 # Usage
 # -----
-# 1. Attach this script to a Camera (or use plugin's TrackballCamera)
+# 1. Attach this script to a Camera (or use plugin's TrackballCamera node)
 # 2. Move Camera as child of the Node to trackball around
 # 3. Make sure your Camera looks at that Node
-# Make sure your camera initially faces said node, and is at a proper distance from it.
+# Make sure your Camera initially faces said Node, and is at a proper distance from it.
 # The initial position of your camera matters. The node does not need to be in the center.
 
 # You can also use this camera to look around you if you place it atop its parent node, spatially.
@@ -32,6 +32,7 @@ extends Camera
 # Authors
 # -------
 # - Ξ 0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498
+# - (you <3)
 
 export var mouseEnabled = true
 export var mouseInvert = false
@@ -55,7 +56,15 @@ export var actionRight = 'ui_right'
 export var actionLeft = 'ui_left'
 export var actionStrength = 1.111
 
-# Multiplier applied to all inputs
+export var zoomEnabled = true
+export var zoomInvert = false
+export var zoomStrength = 1.111
+# There is no default Godot action using mousewheel, so
+# you should make your own actions and use them here.
+export var actionZoomIn = 'ui_page_up'
+export var actionZoomOut = 'ui_page_down'
+
+# Multiplier applied to all lateral (non-zoom) inputs
 export var inertiaStrength = 1.0
 # Fraction of inertia lost on each frame
 export(float, 0, 1, 0.005) var friction = 0.07
@@ -66,10 +75,12 @@ var _cameraRight = Vector3(1, 0, 0)
 var _epsilon = 0.0001
 var _mouseDragStart
 var _mouseDragPosition
-var _dragInertia = Vector2(0, 0)
+var _dragInertia = Vector2(0.0, 0.0)
+var _zoomInertia = 0.0
 
 
 func _ready():
+	# Those were required in earlier versions of Godot
 	set_process_input(true)
 	set_process(true)
 
@@ -96,7 +107,7 @@ func _process(delta):
 						* mouseStrength * (-0.1 if mouseInvert else 0.1)
 		_mouseDragPosition = _currentDragPosition
 
-	if keyboardEnabled:
+	if keyboardEnabled:  # deprecated, use actions
 		var key_i = -1 if keyboardInvert else 1
 		var key_s = keyboardStrength / 1000.0	# exported floats get truncated
 		if Input.is_key_pressed(KEY_LEFT):
@@ -108,7 +119,7 @@ func _process(delta):
 		if Input.is_key_pressed(KEY_DOWN):
 			_dragInertia += Vector2(0, -1 * key_i * key_s)
 
-	if joystickEnabled:
+	if joystickEnabled:  # deprecated, use actions
 		var joy_h = Input.get_joy_axis(joystickDevice, 0)	# left stick horizontal
 		var joy_v = Input.get_joy_axis(joystickDevice, 1)	# left stick vertical
 		var joy_i = -1 if joystickInvert else 1
@@ -120,17 +131,25 @@ func _process(delta):
 			_dragInertia += Vector2(0, joy_i * joy_v * joy_v * sign(joy_v) * joy_s)
 	
 	if actionEnabled:
-		# Exported floats are truncated, so we divide it here
+		# Exported floats are truncated, so we use a bigger number
 		var act_s = actionStrength / 1000.0
 		var act_i = -1 if actionInvert else 1
 		if Input.is_action_pressed(actionUp):
 			addInertia(Vector2(0, act_i * act_s))
 		if Input.is_action_pressed(actionDown):
-			addInertia(Vector2(0, -1 * act_i * act_s))
+			addInertia(Vector2(0, act_i * act_s * -1))
 		if Input.is_action_pressed(actionLeft):
 			addInertia(Vector2(act_i * act_s, 0))
 		if Input.is_action_pressed(actionRight):
-			addInertia(Vector2(-1 * act_i * act_s, 0))
+			addInertia(Vector2(act_i * act_s * -1, 0))
+	
+	if zoomEnabled:
+		var zoo_s = zoomStrength / 1000.0
+		var zoo_i = -1 if zoomInvert else 1
+		if Input.is_action_pressed(actionZoomIn):
+			addZoomInertia(zoo_i * zoo_s)
+		if Input.is_action_pressed(actionZoomOut):
+			addZoomInertia(zoo_i * zoo_s * -1)
 	
 	var inertia = _dragInertia.length()
 	if inertia > _epsilon:
@@ -139,21 +158,36 @@ func _process(delta):
 	elif inertia > 0:
 		_dragInertia.x = 0
 		_dragInertia.y = 0
+	
+	if abs(_zoomInertia) > _epsilon:
+		applyZoom(_zoomInertia)
+		_zoomInertia = _zoomInertia * (1 - friction)
+	else:
+		_zoomInertia = 0
 
 
-# Convenience method for you to move the camera around.
-# inertia is a Vector2 in the normalized right-handed x/y of the screen.
 func addInertia(inertia):
 	"""
 	Move the camera around.
 	inertia:
-		a Vector2 in the normalized right-handed x/y of the screen.
+		a Vector2 in the normalized right-handed x/y of the screen. Y is up.
 	"""
 	_dragInertia += inertia
 
 
+func addZoomInertia(inertia):
+	_zoomInertia += inertia
+
+
 func getNormalizedMousePosition():
 	return get_viewport().get_mouse_position() / get_viewport().get_visible_rect().size
+
+
+func applyZoom(amount):
+	var delta = Vector3(0, 0, -1)
+#	delta *= 0.1
+	delta *= amount
+	translate(delta)
 
 
 func applyRotationFromTangent(tangent):
@@ -162,7 +196,8 @@ func applyRotationFromTangent(tangent):
 	var rg = tr.basis.xform(_cameraRight).normalized()
 	var upQuat = Quat(up, -1 * tangent.x * TAU)
 	var rgQuat = Quat(rg, -1 * tangent.y * TAU)
-	set_transform(Transform(upQuat * rgQuat) * tr)	# :]
+	set_transform(Transform(upQuat * rgQuat) * tr)	# ;)
+
 
 # That's all folks!
 # No-one else contributed to this project, but...
