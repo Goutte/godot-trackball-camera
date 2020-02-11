@@ -3,7 +3,7 @@ extends Camera
 # Makes this Camera respond to input from mouse, keyboard, joystick and touch,
 # in order to rotate around its parent node while facing it.
 # We're using quaternions, so no infamous gimbal lock.
-# The camera has (opt-out) inertia for a smoother experience.
+# The camera has (an opt-out) inertia for a smoother experience.
 
 # todo: test if touch works on android and html5, try SCREEN_DRAG otherwise
 # todo: move to snake_case API to conform with guidelines
@@ -59,9 +59,12 @@ export var actionStrength = 1.111
 export var zoomEnabled = true
 export var zoomInvert = false
 export var zoomStrength = 1.111
+# As distances between the camera and its target
+export var zoomMinimum = 3
+export var zoomMaximum = 95.0
 # There is no default Godot action using mousewheel, so
 # you should make your own actions and use them here.
-# We're using `action_just_released` to catch mousewheels,
+# We're using `action_just_released` to catch mousewheels properly,
 # which makes it a bit awkward for key presses.
 export var actionZoomIn = 'ui_page_up'
 export var actionZoomOut = 'ui_page_down'
@@ -161,7 +164,15 @@ func _process(delta):
 		_dragInertia.x = 0
 		_dragInertia.y = 0
 	
+	var cp = transform.origin
+	var cpl = cp.length()
 	if abs(_zoomInertia) > _epsilon:
+		if cpl < zoomMinimum:
+			if _zoomInertia > 0:
+				_zoomInertia *= max(0, 1 - (1.333 * (zoomMinimum - cpl) / zoomMinimum))
+			_zoomInertia = _zoomInertia - 0.1 * (zoomMinimum - cpl) / zoomMinimum
+		if cpl > zoomMaximum:
+			_zoomInertia += 0.09 * exp((cpl - zoomMaximum) * 3 + 1) * (cpl - zoomMaximum) * (cpl - zoomMaximum)
 		applyZoom(_zoomInertia)
 		_zoomInertia = _zoomInertia * (1 - friction)
 	else:
