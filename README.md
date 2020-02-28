@@ -16,7 +16,7 @@ A version for Godot `2.x` [is available as well](https://github.com/Goutte/godot
 Features
 --------
 
-- stays around its parent node, even if it moves
+- stays around its parent node, even if the latter moves
 - no gimbal lock (quaternions FTW)
 - camera inertia for a smoother experience
 - the parent node does not have to be centered in the camera's view
@@ -26,7 +26,7 @@ Features
 Install
 -------
 
-The installation is as usual, through the Assets Lib.
+The installation is as usual, through the Assets Library.
 Then, enable the plugin in `Scene > Project Settings > Plugins`.
 
 You can also simply copy the files of this project into yours, it should work.
@@ -41,7 +41,7 @@ The initial position of your camera matters. The node does not need to be in the
 
 You can also use this camera to look around you if you place it atop its parent node, spatially.
 It's going to rotate around itself, and that amounts to looking around.
-You'll probably want to set `mouseInvert` and `keyboardInvert` to true in that case.
+You'll probably want to set `mouse_invert` and `keyboard_invert` to true in that case.
 
 
 Todo
