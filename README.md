@@ -20,7 +20,7 @@ Features
 - no gimbal lock (quaternions FTW)
 - camera inertia for a smoother experience
 - the parent node does not have to be centered in the camera's view
-- analog camera control with joystick, courtesy of @marcello505 (in #4)
+- analog camera control with joystick, courtesy of [@marcello505](https://github.com/marcello505) (in [#4](https://github.com/Goutte/godot-trackball-camera/pull/4))
 - a bunch of parameters to configure everything as you want it
 
 
