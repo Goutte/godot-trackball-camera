@@ -184,16 +184,16 @@ func process_actions(delta):
 		var act_s:float
 		var act_i = -1 if action_invert else 1
 		if Input.is_action_pressed(action_up):
-			act_s = Input.get_action_strength(action_up) / 1000.0
+			act_s = Input.get_action_strength(action_up) * action_strength / 1000.0
 			add_inertia(Vector2(0, act_i * act_s))
 		if Input.is_action_pressed(action_down):
-			act_s = Input.get_action_strength(action_down) / 1000.0
+			act_s = Input.get_action_strength(action_down) * action_strength / 1000.0
 			add_inertia(Vector2(0, act_i * act_s * -1))
 		if Input.is_action_pressed(action_left):
-			act_s = Input.get_action_strength(action_left) / 1000.0
+			act_s = Input.get_action_strength(action_left) * action_strength / 1000.0
 			add_inertia(Vector2(act_i * act_s, 0))
 		if Input.is_action_pressed(action_right):
-			act_s = Input.get_action_strength(action_right) / 1000.0
+			act_s = Input.get_action_strength(action_right) * action_strength / 1000.0
 			add_inertia(Vector2(act_i * act_s * -1, 0))
 
 
