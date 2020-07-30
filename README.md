@@ -6,7 +6,7 @@ TrackballCamera for Godot
 [![Release](https://img.shields.io/github/release/Goutte/godot-trackball-camera.svg)](https://github.com/Goutte/godot-trackball-camera/releases)
 [![Donate](https://img.shields.io/badge/%CE%9E-%E2%99%A5-blue.svg)](https://etherscan.io/address/0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498)
 
-A simple [Godot](https://godotengine.org/) `3.x` addon that adds a `TrackballCamera` without gimbal lock.
+A [Godot](https://godotengine.org/) `3.x` addon that adds a `TrackballCamera` node without gimbal lock.
 
 The `TrackballCamera` responds to input from mouse, keyboard, joystick and touch, in order to rotate around its parent node while facing it.
 
@@ -48,7 +48,7 @@ You'll probably want to set `mouse_invert` and `keyboard_invert` to true in that
 Todo
 ----
 
-- [ ] Test if touch works on android and html5, try `SCREEN_DRAG` otherwise.
+- [ ] Test if touch works on android and html5, try `SCREEN_DRAG` otherwise. (see [#6](https://github.com/Goutte/godot-trackball-camera/issues/6))
 
 
 Feedback and contributions are welcome!
