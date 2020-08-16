@@ -23,6 +23,8 @@ extends Camera
 # You can also use this camera to look around you if you place it atop its parent node, spatially.
 # It's going to rotate around itself, and that amounts to looking around.
 # You'll probably want to set mouse_invert and keyboard_invert to true in that case.
+# You can also override apply_constraints()
+# and call apply_updown_constraint()
 
 # License
 # -------
@@ -251,6 +253,28 @@ func apply_zoom(amount):
 	translate(ZOOM_IN * amount)
 
 
+# Override this method to apply your custom constraints.
+# You can both edit the on_transform or make a new one.
+# It's usually faster to edit than create.
+# You need to return a Transform in all cases.
+func apply_constraints(on_transform):
+	return on_transform
+
+
+# Tool you can use in the above method,
+# to make sure we can't look too far up or down.
+# Useful to make sure we can't do headstands with the camera in FPS.
+# Only works well when:
+# - horizon is stabilized
+# - camera is at origin of parent (0,0,0)   (fps mode)
+func apply_updown_constraint(on_transform, limit=0.75):
+	var eulers = on_transform.basis.get_euler()
+	eulers.x = clamp(eulers.x, -limit, limit)
+	eulers.z = 0.0
+	on_transform.basis = Basis(Quat(eulers))
+	return on_transform
+
+
 func apply_rotation_from_tangent(tangent):
 	var tr = get_transform()
 	var up
@@ -261,12 +285,15 @@ func apply_rotation_from_tangent(tangent):
 	var rg = tr.basis.xform(_cameraRight).normalized()
 	var upQuat = Quat(up, -1 * tangent.x * TAU)
 	var rgQuat = Quat(rg, -1 * tangent.y * TAU)
-	set_transform(Transform(upQuat * rgQuat) * tr)
+	var rotated_transform = Transform(upQuat * rgQuat) * tr
+	set_transform(apply_constraints(rotated_transform))
 
 
 func get_mouse_position():
-	return get_viewport().get_mouse_position() \
-			/ get_viewport().get_visible_rect().size
-
+	return (
+		get_viewport().get_mouse_position()
+		/
+		get_viewport().get_visible_rect().size
+	)
 
 # That's all folks!
