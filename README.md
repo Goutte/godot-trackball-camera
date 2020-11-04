@@ -28,9 +28,9 @@ Install
 -------
 
 The installation is as usual, through the Assets Library.
-Then, enable the plugin in `Scene > Project Settings > Plugins`.
-
 You can also simply copy the files of this project into yours, it should work.
+
+Then, enable the plugin in `Scene > Project Settings > Plugins`.
 
 
 Usage
