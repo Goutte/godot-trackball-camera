@@ -83,23 +83,36 @@ export var inertia_strength = 1.0
 # Fraction of inertia lost on each frame
 export(float, 0, 1, 0.005) var friction = 0.07
 
+#export var enable_yaw_limit = true  # left & right
+# Limit as fraction of a half-circle = TAU/2 = PI
+#export(float, 0, 1, 0.005) var yaw_limit = 1.0
 
-const ZOOM_IN = Vector3(0, 0, -1)
-const HORIZON_NORMAL = Vector3(0, 1, 0)
+export var enable_pitch_limit = false  # up & down
+# Limits as fraction of a quarter-circle = TAU/4
+export(float, 0, 1, 0.005) var pitch_up_limit = 1.0
+export(float, 0, 1, 0.005) var pitch_down_limit = 1.0
+export(float, 0, 100, 0.05) var pitch_limit_strength = 1.0
 
+
+# If you need those as exported variables, it can happen
+const ZOOM_IN = Vector3.FORWARD
+const HORIZON_NORMAL = Vector3.UP
+const QUARTER_CIRCLE = 0.25 * TAU
 
 var _iKnowWhatIAmDoing = false	# lesswrong.org
-var _cameraUp = Vector3(0, 1, 0)
-var _cameraRight = Vector3(1, 0, 0)
-var _epsilon = 0.0001
+var _cameraUp = Vector3.UP
+var _cameraRight = Vector3.RIGHT
+var _inertiaTreshold = 0.0001
 var _mouseDragStart
 var _mouseDragPosition
-var _dragInertia = Vector2(0.0, 0.0)
+var _dragInertia = Vector2.ZERO
 var _zoomInertia = 0.0
+var _referenceTransform
 
 
 func _ready():  # this allows overriding through inheritance
 	ready()
+#	set_reference_transform(self.transform)
 
 
 func _input(event):  # this allows overriding through inheritance
@@ -211,7 +224,7 @@ func process_zoom(delta):
 
 func process_drag_inertia(delta):
 	var inertia = _dragInertia.length()
-	if inertia > _epsilon:
+	if inertia > _inertiaTreshold:
 		apply_rotation_from_tangent(_dragInertia * inertia_strength)
 		_dragInertia = _dragInertia * (1 - friction)
 	elif inertia > 0:
@@ -223,7 +236,7 @@ func process_zoom_inertia(delta):
 	# This whole function is … bouerk.  Please share your improvements!
 	var currentPosition = transform.origin
 	var cpl = currentPosition.length()
-	if abs(_zoomInertia) > _epsilon:
+	if abs(_zoomInertia) > _inertiaTreshold:
 		if cpl < zoom_minimum:
 			if _zoomInertia > 0:
 				_zoomInertia *= max(0, 1 - (1.333 * (zoom_minimum - cpl) / zoom_minimum))
@@ -234,6 +247,17 @@ func process_zoom_inertia(delta):
 		_zoomInertia = _zoomInertia * (1 - friction)
 	else:
 		_zoomInertia = 0
+
+
+#func set_reference_transform(reference_transform):
+#	"""
+#	Set a new reference transform, for the yaw and pitch limits.
+#	"""
+#	_referenceTransform = reference_transform
+#	prints("Reference Basis", _referenceTransform.basis)
+#	prints("Reference Origin", _referenceTransform.origin)
+#	prints("Reference Quat", Quat(_referenceTransform.basis))
+#	prints("Reference Quat Normalized", Quat(_referenceTransform.basis).normalized())
 
 
 func add_inertia(inertia):
@@ -258,10 +282,39 @@ func apply_zoom(amount):
 # It's usually faster to edit than create.
 # You need to return a Transform in all cases.
 func apply_constraints(on_transform):
+	if enable_pitch_limit:
+		on_transform = apply_pitch_constraint(on_transform)
 	return on_transform
 
 
-# Tool you can use in the above method,
+func apply_pitch_constraint(on_transform):
+	var eulers = on_transform.basis.get_euler()
+	
+	var dxu = QUARTER_CIRCLE * pitch_up_limit + eulers.x
+	var dxd = QUARTER_CIRCLE * pitch_down_limit - eulers.x
+	var limit_will = 0
+	var limit_over = 0
+	if (dxu < 0):
+		limit_will = 1
+		limit_over = dxu
+	if (dxd < 0):
+		limit_will = -1
+		limit_over = dxd
+	if 0 != limit_will:
+		_dragInertia.y = 0.0
+		var resistance_strength = (((1 - limit_over) * (1 - limit_over)) - 1)
+		add_inertia((
+			limit_will * Vector2.UP  # direction
+			* 0.00282  # role: yield a sane behavior with defaults
+			* resistance_strength  # grows as the trespassing intensifies
+			* pitch_limit_strength  # allow scaling with other strengths?
+			))
+		# …or modify the transform directly, but it's jittery
+	
+	return on_transform
+
+
+# Tool you can perhaps use in the above method,
 # to make sure we can't look too far up or down.
 # Useful to make sure we can't do headstands with the camera in FPS.
 # Only works well when:
