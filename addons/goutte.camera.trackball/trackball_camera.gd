@@ -20,6 +20,8 @@ extends Camera
 # 3. Move your Camera so that it looks at that Node (translate it along +z a bit)
 # The initial position of your camera matters. The node does not need to be in the center.
 
+# First-Person
+# ------------
 # You can also use this camera to look around you if you place it atop its parent node, spatially.
 # It's going to rotate around itself, and that amounts to looking around.
 # You'll probably want to set mouse_invert and keyboard_invert to true in that case.
@@ -32,7 +34,6 @@ extends Camera
 
 # Authors
 # -------
-# - Ξ 0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498
 # - (you <3)
 
 # Keep the horizon stable, the UP to Y
@@ -69,6 +70,8 @@ export var zoom_strength = 1.0
 # As distances between the camera and its target
 export var zoom_minimum = 3
 export var zoom_maximum = 90.0
+export(float, 0.0, 1.0, 0.000001) var zoomInertiaTreshold = 0.0001
+
 # There is no default Godot action using mousewheel, so
 # you should make your own actions and use them here.
 # We usually use "cam_zoom_in" and "cam_zoom_out".
@@ -80,8 +83,12 @@ export var action_zoom_out = 'ui_page_down'
 
 # Multiplier applied to all lateral (non-zoom) inputs
 export var inertia_strength = 1.0
+# When inertia gets below this treshold, stop the camera
+export(float, 0.0, 1.0, 0.000001) var inertiaTreshold = 0.0001
 # Fraction of inertia lost on each frame
-export(float, 0, 1, 0.005) var friction = 0.07
+export(float, 0.0, 1.0, 0.005) var friction = 0.07
+
+
 
 #export var enable_yaw_limit = true  # left & right
 # Limit as fraction of a half-circle = TAU/2 = PI
@@ -102,7 +109,6 @@ const QUARTER_CIRCLE = 0.25 * TAU
 var _iKnowWhatIAmDoing = false	# lesswrong.org
 var _cameraUp = Vector3.UP
 var _cameraRight = Vector3.RIGHT
-var _inertiaTreshold = 0.0001
 var _mouseDragStart
 var _mouseDragPosition
 var _dragInertia = Vector2.ZERO
@@ -133,10 +139,16 @@ func ready():
 
 func input(event):
 	if mouse_enabled:
-		handle_input_mouse(event)
+		handle_mouse_input(event)
 
 
+# @deprecated : will be removed in next BC break (version 6)
 func handle_input_mouse(event):
+	printerr("Method handle_input_mouse() is deprecated.  Use handle_mouse_input() instead.")
+	handle_mouse_input(event)
+
+
+func handle_mouse_input(event):
 	if (not mouse_move_mode) and (event is InputEventMouseButton):
 		if event.pressed:
 			_mouseDragStart = get_mouse_position()
@@ -224,7 +236,7 @@ func process_zoom(delta):
 
 func process_drag_inertia(delta):
 	var inertia = _dragInertia.length()
-	if inertia > _inertiaTreshold:
+	if inertia > inertiaTreshold:
 		apply_rotation_from_tangent(_dragInertia * inertia_strength)
 		_dragInertia = _dragInertia * (1 - friction)
 	elif inertia > 0:
@@ -236,7 +248,7 @@ func process_zoom_inertia(delta):
 	# This whole function is … bouerk.  Please share your improvements!
 	var currentPosition = transform.origin
 	var cpl = currentPosition.length()
-	if abs(_zoomInertia) > _inertiaTreshold:
+	if abs(_zoomInertia) > zoomInertiaTreshold:
 		if cpl < zoom_minimum:
 			if _zoomInertia > 0:
 				_zoomInertia *= max(0, 1 - (1.333 * (zoom_minimum - cpl) / zoom_minimum))
@@ -302,7 +314,9 @@ func apply_pitch_constraint(on_transform):
 		limit_over = dxd
 	if 0 != limit_will:
 		_dragInertia.y = 0.0
+#		_dragInertia *= 0.618
 		var resistance_strength = (((1 - limit_over) * (1 - limit_over)) - 1)
+		
 		add_inertia((
 			limit_will * Vector2.UP  # direction
 			* 0.00282  # role: yield a sane behavior with defaults
