@@ -67,9 +67,11 @@ export var action_strength = 1.0
 export var zoom_enabled = true
 export var zoom_invert = false
 export var zoom_strength = 1.0
-# As distances between the camera and its target
-export var zoom_minimum = 3
+# Extrema expressed as distances between the camera and its target
+export var zoom_minimum = 3.0
 export var zoom_maximum = 90.0
+# Dampen zoom in when it approaches the minimum (0 = disabled)
+export var zoom_in_dampening = 0.0  # 25.0 works well as a value here
 export(float, 0.0, 1.0, 0.000001) var zoomInertiaTreshold = 0.0001
 
 # There is no default Godot action using mousewheel, so
@@ -113,7 +115,7 @@ var _mouseDragStart
 var _mouseDragPosition
 var _dragInertia = Vector2.ZERO
 var _zoomInertia = 0.0
-var _referenceTransform
+#var _referenceTransform
 
 
 func _ready():  # this allows overriding through inheritance
@@ -246,8 +248,7 @@ func process_drag_inertia(delta):
 
 func process_zoom_inertia(delta):
 	# This whole function is … bouerk.  Please share your improvements!
-	var currentPosition = transform.origin
-	var cpl = currentPosition.length()
+	var cpl = get_distance_to_target()
 	if abs(_zoomInertia) > zoomInertiaTreshold:
 		if cpl < zoom_minimum:
 			if _zoomInertia > 0:
@@ -282,6 +283,10 @@ func add_inertia(inertia):
 
 
 func add_zoom_inertia(inertia):
+	if zoom_in_dampening > 0 and inertia > 0:
+		var delta = abs(get_distance_to_target() - zoom_minimum)
+		var brake = pow(zoom_in_dampening, -1 * delta + 1) + 1
+		inertia /= brake
 	_zoomInertia += inertia
 
 
@@ -362,5 +367,9 @@ func get_mouse_position():
 		/
 		get_viewport().get_visible_rect().size
 	)
+
+func get_distance_to_target():
+	var currentPosition = transform.origin
+	return currentPosition.length()
 
 # That's all folks!
