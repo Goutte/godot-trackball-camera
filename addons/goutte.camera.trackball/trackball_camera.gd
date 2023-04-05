@@ -98,6 +98,8 @@ extends Camera3D
 @export var inertia_treshold = 0.0001 # (float, 0.0, 1.0, 0.000001)
 # Fraction of inertia lost checked each frame
 @export var friction := 0.07 # (float, 0, 1, 0.005)
+# For our friends with motion sickness
+@export var no_drag_inertia := false
 
 
 # Needs more work
@@ -299,7 +301,10 @@ func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 			else:
 				_rollInertia += inertia.length()
 	else:
-		_dragInertia += inertia
+		if self.no_drag_inertia:
+			apply_rotation_from_tangent(inertia * inertia_strength)
+		else:
+			_dragInertia += inertia
 
 
 # Moves the camera towards its target, or away from if inertia is negative.
