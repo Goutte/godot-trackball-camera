@@ -4,12 +4,13 @@ TrackballCamera for Godot
 
 [![MIT](https://img.shields.io/github/license/Goutte/godot-trackball-camera.svg)](https://github.com/Goutte/godot-trackball-camera)
 [![Release](https://img.shields.io/github/release/Goutte/godot-trackball-camera.svg)](https://github.com/Goutte/godot-trackball-camera/releases)
-[![Donate](https://img.shields.io/badge/%CE%9E-%E2%99%A5-blue.svg)](https://etherscan.io/address/0xB48C3B718a1FF3a280f574Ad36F04068d7EAf498)
+[![FeedMePlz](https://img.shields.io/liberapay/patrons/Goutte.svg)](https://liberapay.com/Goutte/)
 
-A [Godot](https://godotengine.org/) `3.x` addon that adds a `TrackballCamera` node without gimbal lock.
+A [Godot](https://godotengine.org/) `4.x` addon that adds a `TrackballCamera` node without gimbal lock.
 
 The `TrackballCamera` responds to input from mouse, keyboard, joystick and touch, in order to rotate around its parent node while facing it.
 
+A version for Godot `3.x` [is available as well](https://github.com/Goutte/godot-trackball-camera/releases/tag/v6.0).
 A version for Godot `2.x` [is available as well](https://github.com/Goutte/godot-trackball-camera/releases/tag/v1.0).
 
 
@@ -17,8 +18,8 @@ Features
 --------
 
 - stays around its parent node, even if the latter moves
-- no gimbal lock (quaternions FTW)
-- camera inertia for a smoother experience
+- no gimbal lock (quaternions 🌟)
+- camera inertia for a smoother experience (can be disabled)
 - the parent node does not have to be centered in the camera's view
 - analog camera control with joystick, courtesy of [@marcello505](https://github.com/marcello505) (in [#4](https://github.com/Goutte/godot-trackball-camera/pull/4))
 - a bunch of parameters to configure everything as you want it
