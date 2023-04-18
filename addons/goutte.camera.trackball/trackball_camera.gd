@@ -8,12 +8,19 @@ extends Camera3D
 #    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|\___|_|  \__,_|
 # Version 7.1
 #
-# Makes this Camera3D respond to input from mouse, keyboard, joystick and touch,
+# Responds to actions and input from mouse, keyboard, joystick and touch,
 # in order to rotate around its parent node while continuously facing it.
-# We're using quaternions, so no infamous gimbal lock.
-# The camera has (an opt-out) inertia for a smoother experience.
+# It is also called an Orbit Camera.
 #
-# todo: use SCREEN_DRAG for pinch zoom
+#
+# Main Features
+# -------------
+# - No gimbal lock (quaternions)
+# - Inertia (optional)
+# - Orbit, zoom, roll
+# - Stabilize or free the horizon
+# - Extensible (hopefully)
+# - One-click creation of camera actions (trackball_camera_inspector_plugin.gd)
 #
 #
 # Requirements
@@ -26,7 +33,7 @@ extends Camera3D
 # -----
 # 1. Attach this script to a Camera3D (or use plugin's TrackballCamera node)
 # 2. Move Camera3D as child of the Node to trackball around
-# 3. Move your Camera3D so that it looks at that Node (translate it along +z a bit)
+# 3. Move your Camera3D so that it looks at that Node (translate it along +Z a bit)
 # The initial position of your camera matters.
 #
 #
@@ -35,7 +42,6 @@ extends Camera3D
 # You can use this camera to look around if you place it atop its parent node.
 # It's going to rotate around itself, and that amounts to looking around.
 # You'll probably want to use the xxxxx_invert properties in that case.
-# You can also override apply_constraints() and call apply_updown_constraint().
 #
 #
 # License
@@ -43,11 +49,9 @@ extends Camera3D
 # Same as Godot, ie. permissive MIT. (https://godotengine.org/license)
 
 
-# Keep the horizon stable, the UP to Y.
-# horizon == rotation axis (in our context)
-# See also action_free_horizon
+# Keep the horizon (ie rotation axis) stable, the UP to Y.
+# See also action_free_horizon to mix up stable and free.
 @export var stabilize_horizon := false
-
 # Only used if horizon is kept stable
 @export var headstand_invert_x := true
 
@@ -56,26 +60,14 @@ extends Camera3D
 @export var mouse_strength := 1.0
 # If true will disable click+drag and move around with the mouse moves
 @export var mouse_move_mode := false
-# Directly bound keyboard is deprecated, use actions instead
-@export var keyboard_enabled := false
-@export var keyboard_invert := false
-@export var keyboard_strength := 1.0
 
-@export var joystick_enabled := true
-@export var joystick_invert := false
-@export var joystick_strength := 1.0
-# The resting state of my joystick's x-axis is ±0.05,
-# so we want to ignore any input below this threshold.
-@export var joystick_threshold := 0.09
-@export var joystick_device := 0
-# Use the project's Actions
 @export var action_enabled := true
 @export var action_invert := false
+@export var action_strength := 1.0
 @export var action_up := 'ui_up'
 @export var action_down := 'ui_down'
 @export var action_right := 'ui_right'
 @export var action_left := 'ui_left'
-@export var action_strength := 1.0
 @export var action_zoom_in := 'cam_zoom_in'
 @export var action_zoom_out := 'cam_zoom_out'
 @export var action_free_horizon := 'cam_free_horizon'
@@ -89,16 +81,20 @@ extends Camera3D
 @export var zoom_maximum := 90.0
 
 # When zoom inertia gets below this treshold, stop zooming
-@export var zoom_inertia_treshold = 0.0001 # (float, 0.0, 1.0, 0.000001)
+@export_range(0.0, 1.0, 0.000001) var zoom_inertia_treshold := 0.0001
 # Dampen zoom in when it approaches the minimum (0 = disabled)
 @export var zoom_in_dampening := 0.0  # 25.0 works well as a value here
 
 # Multiplier applied to all lateral (non-zoom) inputs
 @export var inertia_strength := 1.0
 # When inertia gets below this treshold, stop the camera
-@export var inertia_treshold = 0.0001 # (float, 0.0, 1.0, 0.000001)
-# Fraction of inertia lost checked each frame
-@export var friction := 0.07 # (float, 0, 1, 0.005)
+@export_range(0.0, 1.0, 0.000001) var inertia_treshold := 0.0001
+# Fraction of inertia lost on each frame
+@export_range(0.0, 1.0, 0.0001) var friction := 0.07:
+	set(value):
+		friction = value
+		recompute_lubricant_efficiency()
+
 # Care for our friends with motion sickness
 @export var no_drag_inertia := false
 
@@ -113,15 +109,26 @@ extends Camera3D
 @export var pitch_down_limit := 1.0 # (float, 0, 1, 0.005)
 @export var pitch_limit_strength := 1.0 # (float, 0, 100, 0.05)
 
+# Directly bound keyboard is deprecated, use actions instead
+@export var keyboard_enabled := false
+@export var keyboard_invert := false
+@export var keyboard_strength := 1.0
+# Directly bound joystick is deprecated, use actions instead
+@export var joystick_enabled := false
+@export var joystick_invert := false
+@export var joystick_strength := 1.0
+# The resting state of my joystick's x-axis is ±0.05,
+# so we want to ignore any input below this threshold.
+@export var joystick_threshold := 0.09
+@export var joystick_device := 0
+
 
 const QUARTER_CIRCLE := TAU / 4.0
 const ZOOM_IN := Vector3.FORWARD
-
-const ABSURD_VECTOR2 := Vector2(999999, 666666)
-#const ABSURD_VECTOR2 := Vector2.INF  # Use when available again
-const ABSURD_VECTOR3 := Vector3(999999, 666666, 7777777)
-#const ABSURD_VECTOR3 := Vector3.INF  # Use when available again
-const ZOOM_STRENGTH_NORMALIZATION := 1.0 / 20.0  # to get a sane default at 1
+const ABSURD_VECTOR2 := Vector2.INF
+# Internal normalizations to target sane defaults at 1
+const ZOOM_STRENGTH_NORMALIZATION := 0.05
+const MOUSE_STRENGTH_NORMALIZATION := 0.00005
 
 var _horizonUp := Vector3.UP
 var _cameraUp := Vector3.UP
@@ -131,6 +138,7 @@ var _mouseDragPosition := ABSURD_VECTOR2
 var _dragInertia := Vector2.ZERO
 var _zoomInertia := 0.0
 var _rollInertia := 0.0
+var _lubricantEfficiency := 1.0
 var _isBarrelRollAvailable := false
 var _isFreeHorizonAvailable := false
 var _isZoomInAvailable := false
@@ -151,6 +159,7 @@ func _process(delta: float):  # this allows overriding through inheritance
 
 func ready():
 	detect_actions_availability()
+	recompute_lubricant_efficiency()  # as friction setter may never trigger
 	#print("%s around %s is ready. ♥" % [get_name(), get_parent().get_name()])
 
 
@@ -161,13 +170,17 @@ func input(event: InputEvent):
 
 func handle_mouse_input(event: InputEvent):
 	if (not mouse_move_mode) and (event is InputEventMouseButton):
-		if event.pressed:
+		if (event as InputEventMouseButton).pressed:
 			_mouseDragStart = get_mouse_position()
 		else:
 			_mouseDragStart = ABSURD_VECTOR2
 		_mouseDragPosition = _mouseDragStart
 	if (mouse_move_mode) and (event is InputEventMouseMotion):
-		add_inertia(event.relative * mouse_strength * 0.00005)
+		add_inertia(
+			(event as InputEventMouseMotion).relative *
+			mouse_strength *
+			MOUSE_STRENGTH_NORMALIZATION
+		)
 
 
 func process(delta: float):
@@ -207,12 +220,13 @@ func process_keyboard(delta: float):  # deprecated, use actions
 
 func process_joystick(delta: float):  # deprecated, use actions
 	if joystick_enabled:
-		var joy_h := Input.get_joy_axis(joystick_device, 0)  # left stick horizontal
-		var joy_v := Input.get_joy_axis(joystick_device, 1)  # left stick vertical
+		var joy_h := Input.get_joy_axis(joystick_device, JOY_AXIS_LEFT_X)
+		var abs_joy_h : float = abs(joy_h) as float  # not greenlit-typed right now
+		var joy_v := Input.get_joy_axis(joystick_device, JOY_AXIS_LEFT_Y)
 		var joy_s := joystick_strength / 1000.0  # exported floats are truncated
 		joy_s *= -1.0 if joystick_invert else 1.0
 
-		if abs(joy_h) > joystick_threshold:
+		if abs_joy_h > joystick_threshold:
 			add_inertia(Vector2(joy_h * joy_h * sign(joy_h) * joy_s, 0.0))
 		if abs(joy_v) > joystick_threshold:
 			add_inertia(Vector2(0.0, joy_v * joy_v * sign(joy_v) * joy_s))
@@ -249,7 +263,6 @@ func process_zoom(delta: float):
 
 func process_drag_inertia(delta: float):
 	var inertia := _dragInertia.length()
-	#assert(inertia > 0) # Can fail even happen? → no, unless cosmic rays
 	if inertia > inertia_treshold:
 		apply_rotation_from_tangent(_dragInertia * inertia_strength)
 		apply_drag_friction()
@@ -282,7 +295,7 @@ func process_zoom_inertia(delta: float):
 		_zoomInertia = 0.0
 
 
-# Moves the camera around its target, or barrel rolls it
+# Moves the camera around its target, or barrel rolls it.
 # inertia is a Vector2 in the normalized right-handed x/y of the screen.
 # Y is up.  The origin is in the center of the screen.
 func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
@@ -293,7 +306,7 @@ func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 			else:
 				_rollInertia -= inertia.length()
 		else:
-			if (inertia*Vector2(-1.0, 1.0)).angle_to(-origin) < 0:
+			if (inertia * Vector2(-1.0, 1.0)).angle_to(-origin) < 0:
 				_rollInertia -= inertia.length()
 			else:
 				_rollInertia += inertia.length()
@@ -304,7 +317,7 @@ func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 			_dragInertia += inertia
 
 
-# Moves the camera towards its target, or away from if inertia is negative.
+# Moves the camera towards its target, or away from it if inertia is negative.
 func add_zoom_inertia(inertia: float):
 	if zoom_in_dampening > 0.0 and inertia > 0.0:
 		var delta := float(abs(get_distance_to_target() - zoom_minimum))
@@ -319,9 +332,8 @@ func apply_zoom(amount: float):
 
 # Override this method to apply your custom constraints.
 # You can both edit the on_transform or make a new one.
-# It's usually faster to edit than create ; perhaps not in Godot (COW?)
 func apply_constraints(on_transform: Transform3D) -> Transform3D:
-	if enable_pitch_limit:
+	if enable_pitch_limit and not should_free_horizon():
 		on_transform = apply_pitch_constraint(on_transform)
 	return on_transform
 
@@ -394,15 +406,19 @@ func apply_barrel_roll(amount: float):
 
 
 func apply_drag_friction():
-	_dragInertia = _dragInertia * (1.0 - friction)
+	_dragInertia *= _lubricantEfficiency
 
 
 func apply_roll_friction():
-	_rollInertia = _rollInertia * (1.0 - friction)
+	_rollInertia *= _lubricantEfficiency
 
 
 func apply_zoom_friction():
-	_zoomInertia = _zoomInertia * (1.0 - friction)
+	_zoomInertia *= _lubricantEfficiency
+
+
+func recompute_lubricant_efficiency():
+	_lubricantEfficiency = 1.0 - self.friction
 
 
 func update_horizon(new_up: Vector3):
@@ -446,9 +462,15 @@ func should_stabilize_horizon() -> bool:
 	return (
 		stabilize_horizon
 		and
+		not should_free_horizon()
+	)
+
+
+func should_free_horizon() -> bool:
+	return (
 		_isFreeHorizonAvailable
 		and
-		not Input.is_action_pressed(action_free_horizon)
+		Input.is_action_pressed(action_free_horizon)
 	)
 
 
@@ -473,7 +495,7 @@ func detect_action_availability(action: String, silent := false) -> bool:
 	if ProjectSettings.has_setting("input/%s" % action):
 		return true
 	if not silent:
-		push_warning("%s needs an action named %s to work." % [get_name(), action])
+		push_warning("%s wants an action named %s.  You can add it quickly by using the buttons in its Inspector." % [get_name(), action])
 	return false
 
 
