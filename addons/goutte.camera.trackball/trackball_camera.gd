@@ -1,17 +1,16 @@
+## Responds to actions and input from mouse, keyboard, joystick and touch,
+## in order to rotate around its parent node while continuously facing it.
 extends Camera3D
+#class_name TrackballCamera3D
 
 #  _______             _    _           _ _  _____
 # |__   __|           | |  | |         | | |/ ____|
-#    | |_ __ __ _  ___| | _| |__   __ _| | | |     __ _ _ __ ___   ___ _ __ __ _
-#    | | '__/ _` |/ __| |/ / '_ \ / _` | | | |    / _` | '_ ` _ \ / _ \ '__/ _` |
-#    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | |  __/ | | (_| |
-#    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|\___|_|  \__,_|
-# Version 7.1
+#    | |_ __ __ _  ___| | _| |__   __ _| | | |     __ _ _ __ ___  ___ _ __ __ _
+#    | | '__/ _` |/ __| |/ / '_ \ / _` | | | |    / _` | '_ ` _ \/ _ \ '__/ _` |
+#    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | | __/ | | (_| |
+#    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|___|_|  \__,_|
 #
-# Responds to actions and input from mouse, keyboard, joystick and touch,
-# in order to rotate around its parent node while continuously facing it.
-# It is also called an Orbit Camera.
-#
+# Version 7.2
 #
 # Main Features
 # -------------
@@ -33,7 +32,7 @@ extends Camera3D
 # -----
 # 1. Attach this script to a Camera3D (or use plugin's TrackballCamera node)
 # 2. Move Camera3D as child of the Node to trackball around
-# 3. Move your Camera3D so that it looks at that Node (translate it along +Z a bit)
+# 3. Move your Camera3D so that it looks at that Node (move it along +Z a bit)
 # The initial position of your camera matters.
 #
 #
@@ -47,79 +46,153 @@ extends Camera3D
 # License
 # -------
 # Same as Godot, ie. permissive MIT. (https://godotengine.org/license)
+# Source: https://github.com/Goutte/godot-trackball-camera
 
+@export_group("Horizon")
 
-# Keep the horizon (ie rotation axis) stable, the UP to Y.
-# See also action_free_horizon to mix up stable and free.
+## Keep the horizon [i](the rotation axis)[/i] stable.
+## See also [code]action_free_horizon[/code] to mix up stable and free.
 @export var stabilize_horizon := false
-# Only used if horizon is kept stable
+## When the horizon is kept stable and pitch is not constrained,
+## the user may do headstands and X controls become naturally inverted.
+## Enable this property to mitigate that (undesirable) effect.
 @export var headstand_invert_x := true
 
+@export_group("Mouse 🐭")
+
+## Should this camera respond to mouse drags (or moves) ?
+## Actions from the [code]InputMap[/code] using mouse buttons are unaffected by
+## this setting.
 @export var mouse_enabled := true
+## [b]DEPRECATED[/b]: prefer using [code]mouse_invert_x[/code] and
+## [code]mouse_invert_y[/code] directly.
+## This property will be removed in the next major version of this plugin.
+## Inverts both X and Y axes in regard to both mouse drags and mouse moves.
 @export var mouse_invert := false
+## Invert the intent of all the horizontal mouse movements.
+@export var mouse_invert_x := false
+## Invert the intent of all the vertical mouse movements.
+@export var mouse_invert_y := false
+## Coefficient for the intent of mouse movements (both drag and move).
 @export var mouse_strength := 1.0
-# If true will disable click+drag and move around with the mouse moves
+## Disable click&drag and instead move around with the mouse moves.
 @export var mouse_move_mode := false
 
+@export_group("Actions")
+
+## Enable support for actions defined below.
 @export var action_enabled := true
+## [b]DEPRECATED[/b]
 @export var action_invert := false
+## Coefficient for the intent of movements actions.
 @export var action_strength := 1.0
+## Name of the action in the [code]InputMap[/code] that should add an upwards
+## movement intent to this camera.
+## [b]Tip[/b]: set [code]cam_up[/code] here instead of [code]ui_up[/code],
+## reload the inspector, and use the button that should appear above this field
+## to quickly create a new action with nice defaults.
 @export var action_up := 'ui_up'
+## Name of the action in the [code]InputMap[/code] that should add a downwards
+## movement intent to this camera.
+## [b]Tip[/b]: set [code]cam_down[/code] here instead of [code]ui_down[/code],
+## reload the inspector, and use the button that should appear above this field
+## to quickly create a new action with nice defaults.
 @export var action_down := 'ui_down'
+## Name of the action in the [code]InputMap[/code] that should add an eastwards
+## movement intent to this camera.
+## [b]Tip[/b]: set [code]cam_right[/code] here instead of [code]ui_right[/code],
+## reload the inspector, and use the button that should appear above this field
+## to quickly create a new action with nice defaults.
 @export var action_right := 'ui_right'
+## Name of the action in the [code]InputMap[/code] that should add a westwards
+## movement intent to this camera.
+## [b]Tip[/b]: set [code]cam_left[/code] here instead of [code]ui_left[/code],
+## reload the inspector, and use the button that should appear above this field
+## to quickly create a new action with nice defaults.
 @export var action_left := 'ui_left'
+## Name of the action in the [code]InputMap[/code] that should add a movement
+## intent inwards, towards the target of this camera.
 @export var action_zoom_in := 'cam_zoom_in'
+## Name of the action in the [code]InputMap[/code] that should add a movement
+## intent outwards, away from the target of this camera.
 @export var action_zoom_out := 'cam_zoom_out'
+## Name of the action in the [code]InputMap[/code] that should temporarily free
+## the horizon during activation.  (right mouse click works well)
+## Useful only if [code]stabilize_horizon[/code] is set to [code]true[/code].
 @export var action_free_horizon := 'cam_free_horizon'
+## Name of the action in the [code]InputMap[/code] that should enable the
+## [i]barrel roll mode[/i] for the whole duration of its activation,
+## mode in which movement intents are converted to roll rotations.
+## The default, generated action uses the middle mouse button for this.
 @export var action_barrel_roll := 'cam_barrel_roll'
 
-@export var zoom_enabled := true
-@export var zoom_invert := false
-@export var zoom_strength := 1.0
-# As worldspace distances between the camera and its target
-@export var zoom_minimum := 3.0
-@export var zoom_maximum := 90.0
+@export_group("Zoom")
 
-# When zoom inertia gets below this treshold, stop zooming
-@export_range(0.0, 1.0, 0.000001) var zoom_inertia_treshold := 0.0001
-# Dampen zoom in when it approaches the minimum (0 = disabled)
+## Enable zoom control, movement towards or away from the target.
+@export var zoom_enabled := true
+## [b]DEPRECATED[/b]: prefer using a negative [code]zoom_strength[/code].
+## This property will be removed in the next major version of this plugin,
+## during the next performance review and optimization cycle.
+## Invert the intent of the zoom.
+@export var zoom_invert := false
+## Coefficient for the intent of zoom actions.
+@export var zoom_strength := 1.0
+## A minimum worldspace distance between this camera and its target.
+@export var zoom_minimum := 1.0
+## A maximum worldspace distance between this camera and its target.
+@export var zoom_maximum := 100.0
+## When zoom inertia gets below this threshold, stop zooming.
+@export_range(0.0, 1.0, 0.000001) var zoom_inertia_threshold := 0.0001
+## Dampen zoom in when it approaches the minimum (0 = disabled).
 @export var zoom_in_dampening := 0.0  # 25.0 works well as a value here
 
-# Multiplier applied to all lateral (non-zoom) inputs
+@export_group("Inertia")
+
+## Care for our friends with motion sickness.
+@export var no_drag_inertia := false
+## Coefficient applied to all lateral (non-zoom) intents.
 @export var inertia_strength := 1.0
-# When inertia gets below this treshold, stop the camera
-@export_range(0.0, 1.0, 0.000001) var inertia_treshold := 0.0001
-# Fraction of inertia lost on each frame
+## When inertia gets below this threshold, stop the camera.
+@export_range(0.0, 1.0, 0.000001) var inertia_threshold := 0.0001
+## Fraction of inertia lost on each frame.
 @export_range(0.0, 1.0, 0.0001) var friction := 0.07:
 	set(value):
 		friction = value
 		recompute_lubricant_efficiency()
 
-# Care for our friends with motion sickness
-@export var no_drag_inertia := false
+
+@export_group("Pitch Constraints")
 
 # Needs more work
 #export var enable_yaw_limit = true  # left & right
 # Limit as fraction of a half-circle = TAU/2 = PI
 #export var yaw_limit = 1.0 # (float, 0, 1, 0.005)
-
+## Enable (experimental) pitch limits.  Works best with a stable horizon.
 @export var enable_pitch_limit := false  # up & down
-# Limits as fraction of a quarter-circle (TAU/4)
-@export var pitch_up_limit := 1.0 # (float, 0, 1, 0.005)
-@export var pitch_down_limit := 1.0 # (float, 0, 1, 0.005)
-@export var pitch_limit_strength := 1.0 # (float, 0, 100, 0.05)
+## Limit as fraction of a quarter-circle ([code]TAU/4[/code])
+@export_range(0.0, 1.0, 0.005) var pitch_up_limit := 1.0
+## Limit as fraction of a quarter-circle ([code]TAU/4[/code])
+@export_range(0.0, 1.0, 0.005) var pitch_down_limit := 1.0
+## Strength of the resistance when approaching a pitch limit.
+@export var pitch_limit_strength := 1.0
 
-# Directly bound keyboard is deprecated, use actions instead
+@export_group("Deprecated")
+
+## [b]DEPRECATED[/b]: Directly bound keyboard is deprecated, use actions instead.
 @export var keyboard_enabled := false
+## [b]DEPRECATED[/b]: use actions instead.
 @export var keyboard_invert := false
+## [b]DEPRECATED[/b]: use actions instead.
 @export var keyboard_strength := 1.0
-# Directly bound joystick is deprecated, use actions instead
+## [b]DEPRECATED[/b]: Directly bound joystick is deprecated, use actions instead.
 @export var joystick_enabled := false
+## [b]DEPRECATED[/b]: use actions instead.
 @export var joystick_invert := false
+## [b]DEPRECATED[/b]: use actions instead.
 @export var joystick_strength := 1.0
-# The resting state of my joystick's x-axis is ±0.05,
-# so we want to ignore any input below this threshold.
+## [b]DEPRECATED[/b]: use actions instead.
 @export var joystick_threshold := 0.09
+## [b]DEPRECATED[/b]: use actions instead.
 @export var joystick_device := 0
 
 
@@ -128,7 +201,8 @@ const ZOOM_IN := Vector3.FORWARD
 const ABSURD_VECTOR2 := Vector2.INF
 # Internal normalizations to target sane defaults at 1
 const ZOOM_STRENGTH_NORMALIZATION := 0.05
-const MOUSE_STRENGTH_NORMALIZATION := 0.00005
+const MOUSE_DRAG_STRENGTH_NORMALIZATION := 0.1
+const MOUSE_MOVE_STRENGTH_NORMALIZATION := 0.00005
 
 var _horizonUp := Vector3.UP
 var _cameraUp := Vector3.UP
@@ -179,7 +253,7 @@ func handle_mouse_input(event: InputEvent):
 		add_inertia(
 			(event as InputEventMouseMotion).relative *
 			mouse_strength *
-			MOUSE_STRENGTH_NORMALIZATION
+			MOUSE_MOVE_STRENGTH_NORMALIZATION
 		)
 
 
@@ -196,11 +270,16 @@ func process(delta: float):
 
 func process_mouse(delta: float):
 	if mouse_enabled and _mouseDragPosition != ABSURD_VECTOR2:
-		var _currentDragPosition = get_mouse_position()
-		add_inertia((
-			(_currentDragPosition - _mouseDragPosition)
-			* mouse_strength * (-0.1 if mouse_invert else 0.1)
-		), (_currentDragPosition - Vector2.ONE / 2.0) * Vector2(1.0, -1.0))
+		var _currentDragPosition := get_mouse_position()
+		var intent := _currentDragPosition - _mouseDragPosition
+		intent *= mouse_strength * MOUSE_DRAG_STRENGTH_NORMALIZATION
+		if mouse_invert:
+			intent *= -1.0
+		if mouse_invert_x:
+			intent *= Vector2.LEFT
+		if mouse_invert_y:
+			intent *= Vector2.UP
+		add_inertia(intent, (_currentDragPosition - Vector2.ONE / 2.0) * Vector2(1.0, -1.0))
 		_mouseDragPosition = _currentDragPosition
 
 
@@ -263,7 +342,7 @@ func process_zoom(delta: float):
 
 func process_drag_inertia(delta: float):
 	var inertia := _dragInertia.length()
-	if inertia > inertia_treshold:
+	if inertia > inertia_threshold:
 		apply_rotation_from_tangent(_dragInertia * inertia_strength)
 		apply_drag_friction()
 	else:
@@ -272,7 +351,7 @@ func process_drag_inertia(delta: float):
 
 
 func process_roll_inertia(delta: float):
-	if abs(_rollInertia) > inertia_treshold:
+	if abs(_rollInertia) > inertia_threshold:
 		apply_barrel_roll(_rollInertia * inertia_strength)
 		apply_roll_friction()
 	else:
@@ -282,7 +361,7 @@ func process_roll_inertia(delta: float):
 func process_zoom_inertia(delta: float):
 	# This whole function is … bouerk.  Please share your improvements!
 	var cpl := get_distance_to_target()
-	if abs(_zoomInertia) > zoom_inertia_treshold:
+	if abs(_zoomInertia) > zoom_inertia_threshold:
 		if cpl < zoom_minimum:
 			if _zoomInertia > 0.0:
 				_zoomInertia *= float(max(0, 1 - (1.333 * (zoom_minimum - cpl) / zoom_minimum)))
@@ -381,21 +460,21 @@ func apply_updown_constraint(on_transform: Transform3D, limit := 0.75) -> Transf
 	return on_transform
 
 
-func apply_rotation_from_tangent(orthogonal: Vector2):
+func apply_rotation_from_tangent(tangent: Vector2):
 	var tr := get_transform()
 	var up: Vector3
 
 	if should_stabilize_horizon():
 		up = _horizonUp
-		if headstand_invert_x and is_in_headstand():
-			orthogonal.x *= -1.0
+		if self.headstand_invert_x and is_in_headstand():
+			tangent.x *= -1.0
 	else:
 		up = tr.basis * _cameraUp.normalized()
 		update_horizon(up)
 
 	var rt := tr.basis * _cameraRight.normalized()
-	var upQuat := Quaternion(up, -1.0 * orthogonal.x * TAU)
-	var rgQuat := Quaternion(rt, -1.0 * orthogonal.y * TAU)
+	var upQuat := Quaternion(up, -1.0 * tangent.x * TAU)
+	var rgQuat := Quaternion(rt, -1.0 * tangent.y * TAU)
 	var rotatedTransform := Transform3D(upQuat * rgQuat) * tr
 	set_transform(apply_constraints(rotatedTransform))
 
