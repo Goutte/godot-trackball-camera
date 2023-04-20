@@ -2,9 +2,9 @@
 TrackballCamera for Godot
 -------------------------
 
-[![MIT](https://img.shields.io/github/license/Goutte/godot-trackball-camera.svg)](https://github.com/Goutte/godot-trackball-camera)
-[![Release](https://img.shields.io/github/release/Goutte/godot-trackball-camera.svg)](https://github.com/Goutte/godot-trackball-camera/releases)
-[![FeedMePlz](https://img.shields.io/liberapay/patrons/Goutte.svg)](https://liberapay.com/Goutte/)
+[![MIT](https://img.shields.io/github/license/Goutte/godot-trackball-camera.svg?style=for-the-badge)](https://github.com/Goutte/godot-trackball-camera)
+[![Release](https://img.shields.io/github/release/Goutte/godot-trackball-camera.svg?style=for-the-badge)](https://github.com/Goutte/godot-trackball-camera/releases)
+[![FeedStarvingDev](https://img.shields.io/liberapay/patrons/Goutte.svg?style=for-the-badge&logo=liberapay)](https://liberapay.com/Goutte/)
 
 A [Godot](https://godotengine.org/) `4.x` addon that adds a `TrackballCamera` node without gimbal lock.
 
@@ -28,7 +28,7 @@ Features
 Install
 -------
 
-The installation is as usual, through the Assets Library.
+The installation is as usual, through the [Assets Library](https://godotengine.org/asset-library/asset?user=Goutte).
 You can also simply copy the files of this project into yours, it should work.
 
 Then, enable the plugin in `Scene > Project Settings > Plugins`.
