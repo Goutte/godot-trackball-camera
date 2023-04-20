@@ -10,7 +10,7 @@ extends Camera3D
 #    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | | __/ | | (_| |
 #    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|___|_|  \__,_|
 #
-# Version 7.2
+# Version 8.0
 #
 # Main Features
 # -------------
@@ -64,11 +64,6 @@ extends Camera3D
 ## Actions from the [code]InputMap[/code] using mouse buttons are unaffected by
 ## this setting.
 @export var mouse_enabled := true
-## [b]DEPRECATED[/b]: prefer using [code]mouse_invert_x[/code] and
-## [code]mouse_invert_y[/code] directly.
-## This property will be removed in the next major version of this plugin.
-## Inverts both X and Y axes in regard to both mouse drags and mouse moves.
-@export var mouse_invert := false
 ## Invert the intent of all the horizontal mouse movements.
 @export var mouse_invert_x := false
 ## Invert the intent of all the vertical mouse movements.
@@ -82,33 +77,35 @@ extends Camera3D
 
 ## Enable support for actions defined below.
 @export var action_enabled := true
-## [b]DEPRECATED[/b]
-@export var action_invert := false
-## Coefficient for the intent of movements actions.
-@export var action_strength := 1.0
+## Coefficient for the horizontal intent of movement actions.
+## Use a negative value to invert the direction of the horizontal intents.
+@export var action_strength_x := 1.0
+## Coefficient for the vertical intent of movement actions.
+## Use a negative value to invert the direction of the vertical intents.
+@export var action_strength_y := 1.0
 ## Name of the action in the [code]InputMap[/code] that should add an upwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_up[/code] here instead of [code]ui_up[/code],
 ## reload the inspector, and use the button that should appear above this field
-## to quickly create a new action with nice defaults.
+## to quickly create a new action with sensible defaults.
 @export var action_up := 'ui_up'
 ## Name of the action in the [code]InputMap[/code] that should add a downwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_down[/code] here instead of [code]ui_down[/code],
 ## reload the inspector, and use the button that should appear above this field
-## to quickly create a new action with nice defaults.
+## to quickly create a new action with sensible defaults.
 @export var action_down := 'ui_down'
 ## Name of the action in the [code]InputMap[/code] that should add an eastwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_right[/code] here instead of [code]ui_right[/code],
 ## reload the inspector, and use the button that should appear above this field
-## to quickly create a new action with nice defaults.
+## to quickly create a new action with sensible defaults.
 @export var action_right := 'ui_right'
 ## Name of the action in the [code]InputMap[/code] that should add a westwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_left[/code] here instead of [code]ui_left[/code],
 ## reload the inspector, and use the button that should appear above this field
-## to quickly create a new action with nice defaults.
+## to quickly create a new action with sensible defaults.
 @export var action_left := 'ui_left'
 ## Name of the action in the [code]InputMap[/code] that should add a movement
 ## intent inwards, towards the target of this camera.
@@ -130,12 +127,8 @@ extends Camera3D
 
 ## Enable zoom control, movement towards or away from the target.
 @export var zoom_enabled := true
-## [b]DEPRECATED[/b]: prefer using a negative [code]zoom_strength[/code].
-## This property will be removed in the next major version of this plugin,
-## during the next performance review and optimization cycle.
-## Invert the intent of the zoom.
-@export var zoom_invert := false
 ## Coefficient for the intent of zoom actions.
+## Use a negative value to invert the direction of zoom intents.
 @export var zoom_strength := 1.0
 ## A minimum worldspace distance between this camera and its target.
 @export var zoom_minimum := 1.0
@@ -176,33 +169,17 @@ extends Camera3D
 ## Strength of the resistance when approaching a pitch limit.
 @export var pitch_limit_strength := 1.0
 
-@export_group("Deprecated")
-
-## [b]DEPRECATED[/b]: Directly bound keyboard is deprecated, use actions instead.
-@export var keyboard_enabled := false
-## [b]DEPRECATED[/b]: use actions instead.
-@export var keyboard_invert := false
-## [b]DEPRECATED[/b]: use actions instead.
-@export var keyboard_strength := 1.0
-## [b]DEPRECATED[/b]: Directly bound joystick is deprecated, use actions instead.
-@export var joystick_enabled := false
-## [b]DEPRECATED[/b]: use actions instead.
-@export var joystick_invert := false
-## [b]DEPRECATED[/b]: use actions instead.
-@export var joystick_strength := 1.0
-## [b]DEPRECATED[/b]: use actions instead.
-@export var joystick_threshold := 0.09
-## [b]DEPRECATED[/b]: use actions instead.
-@export var joystick_device := 0
-
 
 const QUARTER_CIRCLE := TAU / 4.0
 const ZOOM_IN := Vector3.FORWARD
 const ABSURD_VECTOR2 := Vector2.INF
+const HALF_VECTOR2 := Vector2.ONE / 2.0
+const MIRROR_Y := Vector2(1.0, -1.0)
 # Internal normalizations to target sane defaults at 1
 const ZOOM_STRENGTH_NORMALIZATION := 0.05
 const MOUSE_DRAG_STRENGTH_NORMALIZATION := 0.1
 const MOUSE_MOVE_STRENGTH_NORMALIZATION := 0.00005
+const ACTION_MOVE_STRENGTH_NORMALIZATION := 0.1
 
 var _horizonUp := Vector3.UP
 var _cameraUp := Vector3.UP
@@ -259,8 +236,6 @@ func handle_mouse_input(event: InputEvent):
 
 func process(delta: float):
 	process_mouse(delta)
-	process_keyboard(delta)
-	process_joystick(delta)
 	process_actions(delta)
 	process_zoom(delta)
 	process_drag_inertia(delta)
@@ -273,71 +248,60 @@ func process_mouse(delta: float):
 		var _currentDragPosition := get_mouse_position()
 		var intent := _currentDragPosition - _mouseDragPosition
 		intent *= mouse_strength * MOUSE_DRAG_STRENGTH_NORMALIZATION
-		if mouse_invert:
-			intent *= -1.0
 		if mouse_invert_x:
 			intent *= Vector2.LEFT
 		if mouse_invert_y:
 			intent *= Vector2.UP
-		add_inertia(intent, (_currentDragPosition - Vector2.ONE / 2.0) * Vector2(1.0, -1.0))
+		add_inertia(intent, (_currentDragPosition - HALF_VECTOR2) * MIRROR_Y)
 		_mouseDragPosition = _currentDragPosition
-
-
-func process_keyboard(delta: float):  # deprecated, use actions
-	if keyboard_enabled:
-		var key_s := keyboard_strength / 1000.0  # exported floats get truncated
-		key_s *= -1.0 if keyboard_invert else 1.0
-		if Input.is_key_pressed(KEY_LEFT):
-			add_inertia(Vector2(key_s, 0.0))
-		if Input.is_key_pressed(KEY_RIGHT):
-			add_inertia(Vector2(-1.0 * key_s, 0.0))
-		if Input.is_key_pressed(KEY_UP):
-			add_inertia(Vector2(0.0, key_s))
-		if Input.is_key_pressed(KEY_DOWN):
-			add_inertia(Vector2(0.0, -1.0 * key_s))
-
-
-func process_joystick(delta: float):  # deprecated, use actions
-	if joystick_enabled:
-		var joy_h := Input.get_joy_axis(joystick_device, JOY_AXIS_LEFT_X)
-		var abs_joy_h : float = abs(joy_h) as float  # not greenlit-typed right now
-		var joy_v := Input.get_joy_axis(joystick_device, JOY_AXIS_LEFT_Y)
-		var joy_s := joystick_strength / 1000.0  # exported floats are truncated
-		joy_s *= -1.0 if joystick_invert else 1.0
-
-		if abs_joy_h > joystick_threshold:
-			add_inertia(Vector2(joy_h * joy_h * sign(joy_h) * joy_s, 0.0))
-		if abs(joy_v) > joystick_threshold:
-			add_inertia(Vector2(0.0, joy_v * joy_v * sign(joy_v) * joy_s))
 
 
 func process_actions(delta: float):
 	if action_enabled:
-		# Exported floats are truncated, so we use a bigger number
-		var intent := action_strength / 1000.0
-		intent *= -1.0 if action_invert else 1.0
+		var intent := delta * ACTION_MOVE_STRENGTH_NORMALIZATION
 		if Input.is_action_pressed(action_up):
-			var analog := Input.get_action_strength(action_up)
-			add_inertia(Vector2(0.0, intent * analog))
+			add_inertia(Vector2(
+				0.0
+				,
+				intent
+				* Input.get_action_strength(action_up)
+				* self.action_strength_y
+			))
 		if Input.is_action_pressed(action_down):
-			var analog := Input.get_action_strength(action_down)
-			add_inertia(Vector2(0.0, intent * analog * -1.0))
+			add_inertia(Vector2(
+				0.0
+				,
+				intent
+				* Input.get_action_strength(action_down)
+				* self.action_strength_y
+				* -1.0
+			))
 		if Input.is_action_pressed(action_left):
-			var analog := Input.get_action_strength(action_left)
-			add_inertia(Vector2(intent * analog, 0.0))
+			add_inertia(Vector2(
+				intent
+				* Input.get_action_strength(action_left)
+				* self.action_strength_x
+				,
+				0.0
+			))
 		if Input.is_action_pressed(action_right):
-			var analog := Input.get_action_strength(action_right)
-			add_inertia(Vector2(intent * analog * -1.0, 0.0))
+			add_inertia(Vector2(
+				intent
+				* Input.get_action_strength(action_right)
+				* self.action_strength_x
+				* -1.0
+				,
+				0.0
+			))
 
 
 func process_zoom(delta: float):
 	if zoom_enabled:
-		var inertia := zoom_strength * ZOOM_STRENGTH_NORMALIZATION
-		inertia *= -1.0 if zoom_invert else 1.0
+		var intent := self.zoom_strength * ZOOM_STRENGTH_NORMALIZATION
 		if should_zoom_in():
-			add_zoom_inertia(inertia)
+			add_zoom_inertia(intent)
 		if should_zoom_out():
-			add_zoom_inertia(inertia * -1.0)
+			add_zoom_inertia(intent * -1.0)
 
 
 func process_drag_inertia(delta: float):
@@ -376,7 +340,7 @@ func process_zoom_inertia(delta: float):
 
 # Moves the camera around its target, or barrel rolls it.
 # inertia is a Vector2 in the normalized right-handed x/y of the screen.
-# Y is up.  The origin is in the center of the screen.
+# Y is UP.  The origin is in the center of the screen.
 func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 	if should_barrel_roll():
 		if origin == Vector2.ZERO:
@@ -410,7 +374,7 @@ func apply_zoom(amount: float):
 
 
 # Override this method to apply your custom constraints.
-# You can both edit the on_transform or make a new one.
+# You can safely edit the input on_transform, or make a new one.
 func apply_constraints(on_transform: Transform3D) -> Transform3D:
 	if enable_pitch_limit and not should_free_horizon():
 		on_transform = apply_pitch_constraint(on_transform)
@@ -439,7 +403,7 @@ func apply_pitch_constraint(on_transform: Transform3D) -> Transform3D:
 			limit_will * Vector2.UP  # direction
 			* 0.00282  # role: yield a sane behavior with defaults
 			* resistance_strength  # grows as the trespassing intensifies
-			* pitch_limit_strength  # allow scaling with other strengths?
+			* self.pitch_limit_strength  # user-defined (exported) scaling
 		))
 		# …or modify the transform directly, but it's jittery
 
@@ -504,18 +468,6 @@ func update_horizon(new_up: Vector3):
 	_horizonUp = new_up
 
 
-func get_mouse_position() -> Vector2:
-	return (
-		get_viewport().get_mouse_position()
-		/
-		get_viewport().get_visible_rect().size
-	)
-
-
-func get_distance_to_target() -> float:
-	return transform.origin.length()
-
-
 func is_in_headstand() -> bool:
 	var actualUp := get_transform().basis * _cameraUp.normalized()
 	return actualUp.dot(_horizonUp) < 0.0
@@ -561,6 +513,18 @@ func should_barrel_roll() -> bool:
 	)
 
 
+func get_mouse_position() -> Vector2:
+	return (
+		get_viewport().get_mouse_position()
+		/
+		get_viewport().get_visible_rect().size
+	)
+
+
+func get_distance_to_target() -> float:
+	return self.transform.origin.length()
+
+
 func detect_actions_availability():
 	_isBarrelRollAvailable = detect_action_availability(action_barrel_roll)
 	_isFreeHorizonAvailable = detect_action_availability(action_free_horizon)
@@ -574,7 +538,11 @@ func detect_action_availability(action: String, silent := false) -> bool:
 	if ProjectSettings.has_setting("input/%s" % action):
 		return true
 	if not silent:
-		push_warning("%s wants an action named %s.  You can add it quickly by using the buttons in its Inspector." % [get_name(), action])
+		push_warning(
+			"%s wants an action named %s.  " +
+			"You can add it quickly by using the buttons in its Inspector." %
+			[get_name(), action]
+		)
 	return false
 
 
