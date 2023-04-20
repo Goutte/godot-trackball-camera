@@ -139,6 +139,13 @@ extends Camera3D
 ## Dampen zoom in when it approaches the minimum (0 = disabled).
 @export var zoom_in_dampening := 0.0  # 25.0 works well as a value here
 
+@export_group("Barrel Roll")
+
+## Coefficient applied to all barrel roll intents.
+## Use a negative value to invert the intents.
+## See also [code]action_barrel_roll[/code].
+@export var barrel_roll_strength := 1.0
+
 @export_group("Inertia")
 
 ## Care for our friends with motion sickness.
@@ -170,11 +177,14 @@ extends Camera3D
 @export var pitch_limit_strength := 1.0
 
 
-const QUARTER_CIRCLE := TAU / 4.0
+# Generic constants
+const QUARTER_CIRCLE := 0.25 * TAU
+const CLOCKWISE_CIRCLE := -TAU
 const ZOOM_IN := Vector3.FORWARD
 const ABSURD_VECTOR2 := Vector2.INF
-const HALF_VECTOR2 := Vector2.ONE / 2.0
-const MIRROR_Y := Vector2(1.0, -1.0)
+const HALF_VECTOR2 := Vector2.ONE * 0.5
+const MIRRORED_X := Vector2(-1.0, 1.0)
+const MIRRORED_Y := Vector2(1.0, -1.0)
 # Internal normalizations to target sane defaults at 1
 const ZOOM_STRENGTH_NORMALIZATION := 0.05
 const MOUSE_DRAG_STRENGTH_NORMALIZATION := 0.1
@@ -252,7 +262,7 @@ func process_mouse(delta: float):
 			intent *= Vector2.LEFT
 		if mouse_invert_y:
 			intent *= Vector2.UP
-		add_inertia(intent, (_currentDragPosition - HALF_VECTOR2) * MIRROR_Y)
+		add_inertia(intent, (_currentDragPosition - HALF_VECTOR2) * MIRRORED_Y)
 		_mouseDragPosition = _currentDragPosition
 
 
@@ -306,7 +316,7 @@ func process_zoom(delta: float):
 
 func process_drag_inertia(delta: float):
 	var inertia := _dragInertia.length()
-	if inertia > inertia_threshold:
+	if inertia > self.inertia_threshold:
 		apply_rotation_from_tangent(_dragInertia * inertia_strength)
 		apply_drag_friction()
 	else:
@@ -315,6 +325,7 @@ func process_drag_inertia(delta: float):
 
 
 func process_roll_inertia(delta: float):
+	#var roll_inertia_intensity : float = float(abs(_rollInertia) as float) as float
 	if abs(_rollInertia) > inertia_threshold:
 		apply_barrel_roll(_rollInertia * inertia_strength)
 		apply_roll_friction()
@@ -343,16 +354,17 @@ func process_zoom_inertia(delta: float):
 # Y is UP.  The origin is in the center of the screen.
 func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 	if should_barrel_roll():
+		var rolling := inertia.length() * self.barrel_roll_strength
 		if origin == Vector2.ZERO:
 			if inertia.dot(Vector2.RIGHT + Vector2.UP) < 0:
-				_rollInertia += inertia.length()
+				_rollInertia += rolling
 			else:
-				_rollInertia -= inertia.length()
+				_rollInertia -= rolling
 		else:
-			if (inertia * Vector2(-1.0, 1.0)).angle_to(-origin) < 0:
-				_rollInertia -= inertia.length()
+			if (inertia * MIRRORED_X).angle_to(-origin) < 0:
+				_rollInertia -= rolling
 			else:
-				_rollInertia += inertia.length()
+				_rollInertia += rolling
 	else:
 		if self.no_drag_inertia:
 			apply_rotation_from_tangent(inertia * inertia_strength)
@@ -376,7 +388,7 @@ func apply_zoom(amount: float):
 # Override this method to apply your custom constraints.
 # You can safely edit the input on_transform, or make a new one.
 func apply_constraints(on_transform: Transform3D) -> Transform3D:
-	if enable_pitch_limit and not should_free_horizon():
+	if self.enable_pitch_limit and not should_free_horizon():
 		on_transform = apply_pitch_constraint(on_transform)
 	return on_transform
 
@@ -436,9 +448,9 @@ func apply_rotation_from_tangent(tangent: Vector2):
 		up = tr.basis * _cameraUp.normalized()
 		update_horizon(up)
 
-	var rt := tr.basis * _cameraRight.normalized()
-	var upQuat := Quaternion(up, -1.0 * tangent.x * TAU)
-	var rgQuat := Quaternion(rt, -1.0 * tangent.y * TAU)
+	var rg := tr.basis * _cameraRight.normalized()
+	var upQuat := Quaternion(up, tangent.x * CLOCKWISE_CIRCLE)
+	var rgQuat := Quaternion(rg, tangent.y * CLOCKWISE_CIRCLE)
 	var rotatedTransform := Transform3D(upQuat * rgQuat) * tr
 	set_transform(apply_constraints(rotatedTransform))
 
@@ -477,7 +489,7 @@ func should_zoom_in() -> bool:
 	return (
 		_isZoomInAvailable
 		and
-		Input.is_action_just_released(action_zoom_in)
+		Input.is_action_just_released(self.action_zoom_in)
 	)
 
 
@@ -485,7 +497,7 @@ func should_zoom_out() -> bool:
 	return (
 		_isZoomOutAvailable
 		and
-		Input.is_action_just_released(action_zoom_out)
+		Input.is_action_just_released(self.action_zoom_out)
 	)
 
 
@@ -501,7 +513,7 @@ func should_free_horizon() -> bool:
 	return (
 		_isFreeHorizonAvailable
 		and
-		Input.is_action_pressed(action_free_horizon)
+		Input.is_action_pressed(self.action_free_horizon)
 	)
 
 
@@ -509,7 +521,7 @@ func should_barrel_roll() -> bool:
 	return (
 		_isBarrelRollAvailable
 		and
-		Input.is_action_pressed(action_barrel_roll)
+		Input.is_action_pressed(self.action_barrel_roll)
 	)
 
 
