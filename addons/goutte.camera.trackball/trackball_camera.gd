@@ -10,7 +10,7 @@ extends Camera3D
 #    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | | __/ | | (_| |
 #    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|___|_|  \__,_|
 #
-# Version 8.0
+# Version 8.1
 #
 # Main Features
 # -------------
@@ -551,8 +551,8 @@ func detect_action_availability(action: String, silent := false) -> bool:
 		return true
 	if not silent:
 		push_warning(
-			"%s wants an action named %s.  " +
-			"You can add it quickly by using the buttons in its Inspector." %
+			"""%s wants an action named %s.
+			You can add it quickly by using the buttons in its Inspector.""" %
 			[get_name(), action]
 		)
 	return false
