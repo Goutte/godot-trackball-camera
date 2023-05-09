@@ -1,5 +1,5 @@
-## Responds to actions and input from mouse, keyboard, joystick and touch,
 ## in order to rotate around its parent node while continuously facing it.
+## Responds to actions and input from mouse, keyboard, joystick and touch,
 extends Camera3D
 #class_name TrackballCamera3D
 
@@ -10,7 +10,7 @@ extends Camera3D
 #    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | | __/ | | (_| |
 #    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|___|_|  \__,_|
 #
-# Version 8.1
+# Version 9.0
 #
 # Main Features
 # -------------
@@ -31,9 +31,11 @@ extends Camera3D
 # Usage
 # -----
 # 1. Attach this script to a Camera3D (or use plugin's TrackballCamera node)
-# 2. Move Camera3D as child of the Node to trackball around
-# 3. Move your Camera3D so that it looks at that Node (move it along +Z a bit)
-# The initial position of your camera matters.
+# 2. Set Camera3D as child of the Node3D to trackball around
+# 3. Move your Camera3D so that it looks at that Node3D (move it along +Z a bit)
+# The initial position and rotation of your camera matter.
+# The camera can look in any direction and relative angles should be preserved,
+# unless you disabled inertia (it's a bug that needs work, MRs are welcome).
 #
 #
 # First-Person
@@ -55,7 +57,7 @@ extends Camera3D
 @export var stabilize_horizon := false
 ## When the horizon is kept stable and pitch is not constrained,
 ## the user may do headstands and X controls become naturally inverted.
-## Enable this property to mitigate that (undesirable) effect.
+## Enable this property to mitigate that (usually undesirable) effect.
 @export var headstand_invert_x := true
 
 @export_group("Mouse 🐭")
@@ -123,6 +125,13 @@ extends Camera3D
 ## The default, generated action uses the middle mouse button for this.
 @export var action_barrel_roll := 'cam_barrel_roll'
 
+
+@export_group("Orbit")
+
+## Coefficient applied to all drag (orbit) intents, that is lateral movements.
+@export var orbit_strength := 1.0
+
+
 @export_group("Zoom")
 
 ## Enable zoom control, movement towards or away from the target.
@@ -148,8 +157,9 @@ extends Camera3D
 
 @export_group("Inertia")
 
-## Care for our friends with motion sickness.
-@export var no_drag_inertia := false
+## Disable this for our friends with motion sickness.
+## Disabling this is not yet fully supported and wild glitches may appear.
+@export var inertia_enabled := true
 ## Coefficient applied to all lateral (non-zoom) intents.
 @export var inertia_strength := 1.0
 ## When inertia gets below this threshold, stop the camera.
@@ -170,9 +180,15 @@ extends Camera3D
 ## Enable (experimental) pitch limits.  Works best with a stable horizon.
 @export var enable_pitch_limit := false  # up & down
 ## Limit as fraction of a quarter-circle ([code]TAU/4[/code])
-@export_range(0.0, 1.0, 0.005) var pitch_up_limit := 1.0
+#@export_range(0.0, 1.0, 0.005) var pitch_up_limit := 1.0
 ## Limit as fraction of a quarter-circle ([code]TAU/4[/code])
-@export_range(0.0, 1.0, 0.005) var pitch_down_limit := 1.0
+#@export_range(0.0, 1.0, 0.005) var pitch_down_limit := 1.0
+## Pitch top limit as fraction of a quarter-circle, zero being the equator.
+## Please make sure that the top limit stays greater than the bottom limit.
+@export_range(-1.0, 1.0, 0.005) var pitch_top_limit := 0.618
+## Pitch bottom limit as fraction of a quarter-circle, zero being the equator.
+## Please make sure that the bottom limit stays lower than the top limit.
+@export_range(-1.0, 1.0, 0.005) var pitch_bottom_limit := -0.618
 ## Strength of the resistance when approaching a pitch limit.
 @export var pitch_limit_strength := 1.0
 
@@ -190,6 +206,8 @@ const ZOOM_STRENGTH_NORMALIZATION := 0.05
 const MOUSE_DRAG_STRENGTH_NORMALIZATION := 0.1
 const MOUSE_MOVE_STRENGTH_NORMALIZATION := 0.00005
 const ACTION_MOVE_STRENGTH_NORMALIZATION := 0.1
+const PITCH_SOFT_LIMIT_NORMALIZATION := 0.005
+
 
 var _horizonUp := Vector3.UP
 var _cameraUp := Vector3.UP
@@ -200,10 +218,10 @@ var _dragInertia := Vector2.ZERO
 var _zoomInertia := 0.0
 var _rollInertia := 0.0
 var _lubricantEfficiency := 1.0
-var _isBarrelRollAvailable := false
-var _isFreeHorizonAvailable := false
-var _isZoomInAvailable := false
-var _isZoomOutAvailable := false
+var _isBarrelRollActionAvailable := false
+var _isFreeHorizonActionAvailable := false
+var _isZoomInActionAvailable := false
+var _isZoomOutActionAvailable := false
 
 
 func _ready():  # this allows overriding through inheritance
@@ -225,7 +243,7 @@ func ready():
 
 
 func input(event: InputEvent):
-	if mouse_enabled:
+	if self.mouse_enabled:
 		handle_mouse_input(event)
 
 
@@ -254,13 +272,13 @@ func process(delta: float):
 
 
 func process_mouse(delta: float):
-	if mouse_enabled and _mouseDragPosition != ABSURD_VECTOR2:
+	if self.mouse_enabled and _mouseDragPosition != ABSURD_VECTOR2:
 		var _currentDragPosition := get_mouse_position()
 		var intent := _currentDragPosition - _mouseDragPosition
-		intent *= mouse_strength * MOUSE_DRAG_STRENGTH_NORMALIZATION
-		if mouse_invert_x:
+		intent *= self.mouse_strength * MOUSE_DRAG_STRENGTH_NORMALIZATION
+		if self.mouse_invert_x:
 			intent *= Vector2.LEFT
-		if mouse_invert_y:
+		if self.mouse_invert_y:
 			intent *= Vector2.UP
 		add_inertia(intent, (_currentDragPosition - HALF_VECTOR2) * MIRRORED_Y)
 		_mouseDragPosition = _currentDragPosition
@@ -306,7 +324,7 @@ func process_actions(delta: float):
 
 
 func process_zoom(delta: float):
-	if zoom_enabled:
+	if self.zoom_enabled:
 		var intent := self.zoom_strength * ZOOM_STRENGTH_NORMALIZATION
 		if should_zoom_in():
 			add_zoom_inertia(intent)
@@ -352,6 +370,8 @@ func process_zoom_inertia(delta: float):
 # Moves the camera around its target, or barrel rolls it.
 # inertia is a Vector2 in the normalized right-handed x/y of the screen.
 # Y is UP.  The origin is in the center of the screen.
+# This method needs to be renamed, now, since it's not always inertia.
+# add_tangential_intent() ? or add_drag_intent() perhaps ? add_orbital_intent ?
 func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 	if should_barrel_roll():
 		var rolling := inertia.length() * self.barrel_roll_strength
@@ -366,10 +386,10 @@ func add_inertia(inertia: Vector2, origin := Vector2.ZERO):
 			else:
 				_rollInertia += rolling
 	else:
-		if self.no_drag_inertia:
-			apply_rotation_from_tangent(inertia * inertia_strength)
+		if self.inertia_enabled:
+			_dragInertia += inertia * self.orbit_strength
 		else:
-			_dragInertia += inertia
+			apply_rotation_from_tangent(inertia * self.orbit_strength * 10.0)
 
 
 # Moves the camera towards its target, or away from it if inertia is negative.
@@ -394,45 +414,67 @@ func apply_constraints(on_transform: Transform3D) -> Transform3D:
 
 
 func apply_pitch_constraint(on_transform: Transform3D) -> Transform3D:
-	var eulers := on_transform.basis.get_euler()
+	if self.inertia_enabled:
+		on_transform = apply_soft_pitch_constraint(on_transform)
+	else:
+		# We should probably apply this all the time but it's still glitchy
+		on_transform = apply_hard_pitch_constraint(on_transform)
+	return on_transform
 
-	var dxu := QUARTER_CIRCLE * pitch_up_limit + eulers.x
-	var dxd := QUARTER_CIRCLE * pitch_down_limit - eulers.x
+
+func apply_soft_pitch_constraint(on_transform: Transform3D) -> Transform3D:
+	var eulers := on_transform.basis.get_euler()
+	var dxu := QUARTER_CIRCLE * pitch_top_limit + eulers.x
+	var dxd := QUARTER_CIRCLE * pitch_bottom_limit + eulers.x
+
 	var limit_will := 0.0
 	var limit_over := 0.0
 	if dxu < 0.0:
 		limit_will = 1.0
 		limit_over = dxu
-	if dxd < 0.0:
+	if dxd > 0.0:
 		limit_will = -1.0
-		limit_over = dxd
+		limit_over = -dxd
 	if 0.0 != limit_will:
 		_dragInertia.y = 0.0
 
-		var resistance_strength := (((1.0 - limit_over) * (1.0 - limit_over)) - 1.0)
+		# Perhaps expose this formula to overrides ?
+		var resistance_strength := ((pow(1.0 - limit_over, 4)) - 1.0)
 
 		add_inertia((
 			limit_will * Vector2.UP  # direction
-			* 0.00282  # role: yield a sane behavior with defaults
+			* PITCH_SOFT_LIMIT_NORMALIZATION  # role: yield a sane behavior with defaults
 			* resistance_strength  # grows as the trespassing intensifies
 			* self.pitch_limit_strength  # user-defined (exported) scaling
 		))
-		# …or modify the transform directly, but it's jittery
 
 	return on_transform
 
 
-# Tool you can perhaps use in the above method,
-# to make sure we can't look too far up or down.
-# Useful to make sure we can't do headstands with the camera in FPS.
-# Only works well when:
-# - horizon is stabilized
-# - camera is at origin of parent (0,0,0)   (fps mode)
-func apply_updown_constraint(on_transform: Transform3D, limit := 0.75) -> Transform3D:
-	var eulers: Vector3 = on_transform.basis.get_euler()
-	eulers.x = clamp(eulers.x, -limit, limit)
+# Glitchy (unstable, drifts).   This naive implementation needs more work.
+func apply_hard_pitch_constraint(on_transform: Transform3D) -> Transform3D:
+	var eulers := on_transform.basis.get_euler()
+	var previousEulerX := eulers.x
+	# 1. Clamp the camera angle
+	eulers.x = clamp(eulers.x, -self.pitch_top_limit, -self.pitch_bottom_limit)
 	eulers.z = 0.0
-	on_transform.basis = Basis(Quaternion.from_euler(eulers))
+	on_transform.basis = Basis.from_euler(eulers)
+
+	# 2. Project the camera position to the closest point in space inside the
+	# defined boundaries, without correcting the angle, and so creating a drift.
+	var correctedAngle := eulers.x - previousEulerX
+	if 0 != correctedAngle:
+		var distance: float = on_transform.origin.length()
+		var pitchConstraintAxis := get_pitch_constraint_axis()
+		var horizonPlane := Plane(pitchConstraintAxis, Vector3.ZERO)
+		var newOrigin := horizonPlane.project(on_transform.origin)
+		newOrigin = newOrigin.normalized() * distance
+		newOrigin = newOrigin.rotated(
+			newOrigin.cross(pitchConstraintAxis).normalized(),
+			(self.pitch_top_limit if correctedAngle > 0 else self.pitch_bottom_limit),
+		)
+		on_transform.origin = newOrigin
+
 	return on_transform
 
 
@@ -441,14 +483,14 @@ func apply_rotation_from_tangent(tangent: Vector2):
 	var up: Vector3
 
 	if should_stabilize_horizon():
-		up = _horizonUp
+		up = get_horizon()
 		if self.headstand_invert_x and is_in_headstand():
 			tangent.x *= -1.0
 	else:
-		up = tr.basis * _cameraUp.normalized()
+		up = get_camera_up()
 		update_horizon(up)
 
-	var rg := tr.basis * _cameraRight.normalized()
+	var rg := get_camera_right()
 	var upQuat := Quaternion(up, tangent.x * CLOCKWISE_CIRCLE)
 	var rgQuat := Quaternion(rg, tangent.y * CLOCKWISE_CIRCLE)
 	var rotatedTransform := Transform3D(upQuat * rgQuat) * tr
@@ -457,7 +499,7 @@ func apply_rotation_from_tangent(tangent: Vector2):
 
 func apply_barrel_roll(amount: float):
 	rotate_object_local(Vector3.BACK, amount)
-	update_horizon(get_transform().basis * _cameraUp.normalized())
+	update_horizon((get_transform().basis * _cameraUp).normalized())
 
 
 func apply_drag_friction():
@@ -476,18 +518,33 @@ func recompute_lubricant_efficiency():
 	_lubricantEfficiency = 1.0 - self.friction
 
 
+func get_camera_up() -> Vector3:  # in parent's space
+	return (get_transform().basis * Vector3.UP).normalized()
+
+
+func get_camera_right() -> Vector3:  # in parent's space
+	return (get_transform().basis * Vector3.RIGHT).normalized()
+
+
+func get_pitch_constraint_axis() -> Vector3:  # in parent's space
+	return Vector3.UP  # todo: allow customization via @exports
+
+
+func get_horizon() -> Vector3:  # in parent's space
+	return _horizonUp
+
+
 func update_horizon(new_up: Vector3):
 	_horizonUp = new_up
 
 
 func is_in_headstand() -> bool:
-	var actualUp := get_transform().basis * _cameraUp.normalized()
-	return actualUp.dot(_horizonUp) < 0.0
+	return get_camera_up().dot(get_horizon()) < 0.0
 
 
 func should_zoom_in() -> bool:
 	return (
-		_isZoomInAvailable
+		_isZoomInActionAvailable
 		and
 		Input.is_action_just_released(self.action_zoom_in)
 	)
@@ -495,7 +552,7 @@ func should_zoom_in() -> bool:
 
 func should_zoom_out() -> bool:
 	return (
-		_isZoomOutAvailable
+		_isZoomOutActionAvailable
 		and
 		Input.is_action_just_released(self.action_zoom_out)
 	)
@@ -511,7 +568,7 @@ func should_stabilize_horizon() -> bool:
 
 func should_free_horizon() -> bool:
 	return (
-		_isFreeHorizonAvailable
+		_isFreeHorizonActionAvailable
 		and
 		Input.is_action_pressed(self.action_free_horizon)
 	)
@@ -519,7 +576,7 @@ func should_free_horizon() -> bool:
 
 func should_barrel_roll() -> bool:
 	return (
-		_isBarrelRollAvailable
+		_isBarrelRollActionAvailable
 		and
 		Input.is_action_pressed(self.action_barrel_roll)
 	)
@@ -538,24 +595,21 @@ func get_distance_to_target() -> float:
 
 
 func detect_actions_availability():
-	_isBarrelRollAvailable = detect_action_availability(action_barrel_roll)
-	_isFreeHorizonAvailable = detect_action_availability(action_free_horizon)
-	_isZoomInAvailable = detect_action_availability(action_zoom_in)
-	_isZoomOutAvailable = detect_action_availability(action_zoom_out)
+	_isBarrelRollActionAvailable = is_action_available(action_barrel_roll)
+	_isFreeHorizonActionAvailable = is_action_available(action_free_horizon)
+	_isZoomInActionAvailable = is_action_available(action_zoom_in)
+	_isZoomOutActionAvailable = is_action_available(action_zoom_out)
 
 
-func detect_action_availability(action: String, silent := false) -> bool:
+func is_action_available(action: String, silent := false) -> bool:
 	if action == "":
 		return false
 	if ProjectSettings.has_setting("input/%s" % action):
 		return true
-	if not silent:
+	if not self.silent:
 		push_warning(
-			"""%s wants an action named %s.
+			"""%s is requesting an action named '%s'.
 			You can add it quickly by using the buttons in its Inspector.""" %
 			[get_name(), action]
 		)
 	return false
-
-
-# That's all folks!
