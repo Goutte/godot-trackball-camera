@@ -179,18 +179,23 @@ extends Camera3D
 #export var yaw_limit = 1.0 # (float, 0, 1, 0.005)
 ## Enable (experimental) pitch limits.  Works best with a stable horizon.
 @export var enable_pitch_limit := false  # up & down
-## Limit as fraction of a quarter-circle ([code]TAU/4[/code])
-#@export_range(0.0, 1.0, 0.005) var pitch_up_limit := 1.0
-## Limit as fraction of a quarter-circle ([code]TAU/4[/code])
-#@export_range(0.0, 1.0, 0.005) var pitch_down_limit := 1.0
-## Pitch top limit as fraction of a quarter-circle, zero being the equator.
+## Pitch top limit as fraction of a quarter-circle, zero being the equator,
+## 1.0 the north pole and -1.0 the south pole.
 ## Please make sure that the top limit stays greater than the bottom limit.
 @export_range(-1.0, 1.0, 0.005) var pitch_top_limit := 0.618
 ## Pitch bottom limit as fraction of a quarter-circle, zero being the equator.
+## 1.0 the north pole and -1.0 the south pole.
 ## Please make sure that the bottom limit stays lower than the top limit.
 @export_range(-1.0, 1.0, 0.005) var pitch_bottom_limit := -0.618
 ## Strength of the resistance when approaching a pitch limit.
-@export var pitch_limit_strength := 1.0
+@export var pitch_soft_limit_strength := 1.0
+
+#enum PitchLimitMode {
+#	SOFT,
+#	HARD,
+#	BOTH,
+#}
+#@export var pitch_limit_mode: PitchLimitMode = PitchLimitMode.BOTH
 
 
 # Generic constants
@@ -417,42 +422,62 @@ func apply_pitch_constraint(on_transform: Transform3D) -> Transform3D:
 	if self.inertia_enabled:
 		on_transform = apply_soft_pitch_constraint(on_transform)
 	else:
-		# We should probably apply this all the time but it's still glitchy
 		on_transform = apply_hard_pitch_constraint(on_transform)
+
 	return on_transform
 
 
 func apply_soft_pitch_constraint(on_transform: Transform3D) -> Transform3D:
 	var eulers := on_transform.basis.get_euler()
-	var dxu := QUARTER_CIRCLE * pitch_top_limit + eulers.x
-	var dxd := QUARTER_CIRCLE * pitch_bottom_limit + eulers.x
+	var top_overflow := - QUARTER_CIRCLE * self.pitch_top_limit - eulers.x
+	var bottom_overflow := QUARTER_CIRCLE * self.pitch_bottom_limit + eulers.x
 
 	var limit_will := 0.0
 	var limit_over := 0.0
-	if dxu < 0.0:
-		limit_will = 1.0
-		limit_over = dxu
-	if dxd > 0.0:
+	if top_overflow > 0.0:
 		limit_will = -1.0
-		limit_over = -dxd
+		limit_over = top_overflow
+	if bottom_overflow > 0.0:
+		limit_will = 1.0
+		limit_over = bottom_overflow
+
 	if 0.0 != limit_will:
+		# Cancel vertical intent to prevent some bruteforcing
 		_dragInertia.y = 0.0
 
-		# Perhaps expose this formula to overrides ?
+		# Perhaps expose this formula through an override ?
 		var resistance_strength := ((pow(1.0 - limit_over, 4)) - 1.0)
 
 		add_inertia((
 			limit_will * Vector2.UP  # direction
-			* PITCH_SOFT_LIMIT_NORMALIZATION  # role: yield a sane behavior with defaults
+			* PITCH_SOFT_LIMIT_NORMALIZATION  # role: yield sane defaults
 			* resistance_strength  # grows as the trespassing intensifies
-			* self.pitch_limit_strength  # user-defined (exported) scaling
+			* self.pitch_soft_limit_strength  # user-defined (exported) coeff
 		))
+
+	return on_transform
+
+# Experimental: assumes the pitch constraint axis is UP
+# todo: consider get_pitch_constraint_axis() at some point
+func apply_hard_pitch_constraint(on_transform: Transform3D) -> Transform3D:
+	# eulers.x is in radians, -TAU/4 at north pole, TAU/4 at south, 0 at equator
+	var eulers := on_transform.basis.get_euler()
+	var top_overflow = - QUARTER_CIRCLE * self.pitch_top_limit - eulers.x
+	var bottom_overflow = QUARTER_CIRCLE * self.pitch_bottom_limit + eulers.x
+
+	if 0 < top_overflow:
+		var rg := (on_transform.basis * Vector3.RIGHT).normalized()
+		on_transform = on_transform.rotated(rg, top_overflow)
+	elif 0 < bottom_overflow:
+		var rg := (on_transform.basis * Vector3.RIGHT).normalized()
+		on_transform = on_transform.rotated(rg, -bottom_overflow)
 
 	return on_transform
 
 
 # Glitchy (unstable, drifts).   This naive implementation needs more work.
-func apply_hard_pitch_constraint(on_transform: Transform3D) -> Transform3D:
+# But it is an interesting approach, so it's still hanging around for now.
+func apply_hard_pitch_constraint_drift(on_transform: Transform3D) -> Transform3D:
 	var eulers := on_transform.basis.get_euler()
 	var previousEulerX := eulers.x
 	# 1. Clamp the camera angle
@@ -479,21 +504,19 @@ func apply_hard_pitch_constraint(on_transform: Transform3D) -> Transform3D:
 
 
 func apply_rotation_from_tangent(tangent: Vector2):
-	var tr := get_transform()
 	var up: Vector3
-
 	if should_stabilize_horizon():
 		up = get_horizon()
 		if self.headstand_invert_x and is_in_headstand():
 			tangent.x *= -1.0
 	else:
 		up = get_camera_up()
-		update_horizon(up)
+		update_horizon(up)  # hmmm ; tbd
 
 	var rg := get_camera_right()
 	var upQuat := Quaternion(up, tangent.x * CLOCKWISE_CIRCLE)
 	var rgQuat := Quaternion(rg, tangent.y * CLOCKWISE_CIRCLE)
-	var rotatedTransform := Transform3D(upQuat * rgQuat) * tr
+	var rotatedTransform := Transform3D(upQuat * rgQuat) * get_transform()
 	set_transform(apply_constraints(rotatedTransform))
 
 
