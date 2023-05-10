@@ -24,6 +24,7 @@ Features
 - the parent node does not have to be centered in the camera's view
 - analog camera control with joystick, courtesy of [@marcello505](https://github.com/marcello505) (in [#4](https://github.com/Goutte/godot-trackball-camera/pull/4))
 - a bunch of parameters to configure everything as you want it
+- one-click creation of camera actions (_jams!_)
 
 
 Install
@@ -51,7 +52,6 @@ Todo
 ----
 
 - [ ] Test if touch works on android and html5, try `SCREEN_DRAG` otherwise. (see [#6](https://github.com/Goutte/godot-trackball-camera/issues/6))
-- [ ] Fix drift glitch when inertia is disabled and pitch limits are enabled.
 
 
 Feedback and contributions are welcome!
