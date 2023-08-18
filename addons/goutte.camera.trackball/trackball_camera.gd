@@ -629,7 +629,7 @@ func is_action_available(action: String, silent := false) -> bool:
 		return false
 	if ProjectSettings.has_setting("input/%s" % action):
 		return true
-	if not self.silent:
+	if not silent:
 		push_warning(
 			"""%s is requesting an action named '%s'.
 			You can add it quickly by using the buttons in its Inspector.""" %
