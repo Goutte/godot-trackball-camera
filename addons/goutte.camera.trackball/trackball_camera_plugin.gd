@@ -16,7 +16,8 @@ func _enter_tree():
 	)
 	
 	var godot_theme := get_editor_interface().get_base_control().theme
-	inspector_plugin.warning_icon = godot_theme.get_icon('StatusWarning', 'EditorIcons')
+	if godot_theme != null:
+		inspector_plugin.warning_icon = godot_theme.get_icon('StatusWarning', 'EditorIcons')
 	# Quite handy dump of the list of available icons
 #	var list = Array(godot_theme.get_icon_list('EditorIcons'))
 #	list.sort()

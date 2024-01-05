@@ -7,7 +7,7 @@ const ALL_DEVICES := -1
 
 
 # Injected because I can't figure out how to access Godot's theme from here
-var warning_icon: Texture2D
+var warning_icon: Texture2D = null
 
 
 func _can_handle(object):
@@ -27,6 +27,7 @@ func _parse_property(object, type, name, hint_type, hint_string, usage_flags, wi
 	if not name.begins_with("action_"):
 		return
 	# Nonexistent function 'detect_action_availability' in base 'Camera3D ()'.
+	# Because the camera is not a @tool (and we don't want to make it one)
 #	var camera = object as EipTrackballCamera
 #	if camera.detect_action_availability(object.get(name), true):
 #		return
@@ -37,7 +38,7 @@ func _parse_property(object, type, name, hint_type, hint_string, usage_flags, wi
 	var create_action_button := Button.new()
 	create_action_button.set_name("CreateAction%s" % name)
 	create_action_button.set_text("Create action %s" % [object.get(name)])
-	if warning_icon:
+	if warning_icon != null:
 		create_action_button.icon = warning_icon
 	create_action_button.pressed.connect(
 		func():
@@ -54,7 +55,7 @@ func _parse_property(object, type, name, hint_type, hint_string, usage_flags, wi
 	add_custom_control(create_action_button)
 
 
-func add_default_action(object, name):
+func add_default_action(object: Object, name: String):
 	var setting_key = "input/%s" % object.get(name)
 	var setting = {
 		'deadzone': 0.5,

@@ -1,7 +1,8 @@
-## in order to rotate around its parent node while continuously facing it.
-## Responds to actions and input from mouse, keyboard, joystick and touch,
 extends Camera3D
 #class_name TrackballCamera3D
+
+## Responds to actions and input from mouse, keyboard, joystick and touch,
+## in order to rotate around its parent node while continuously facing it.
 
 #  _______             _    _           _ _  _____
 # |__   __|           | |  | |         | | |/ ____|
@@ -10,7 +11,7 @@ extends Camera3D
 #    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | | __/ | | (_| |
 #    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|___|_|  \__,_|
 #
-# Version 9.0
+# Version 9.2
 #
 # Main Features
 # -------------
@@ -90,40 +91,40 @@ extends Camera3D
 ## [b]Tip[/b]: set [code]cam_up[/code] here instead of [code]ui_up[/code],
 ## reload the inspector, and use the button that should appear above this field
 ## to quickly create a new action with sensible defaults.
-@export var action_up := 'ui_up'
+@export var action_up := &"ui_up"
 ## Name of the action in the [code]InputMap[/code] that should add a downwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_down[/code] here instead of [code]ui_down[/code],
 ## reload the inspector, and use the button that should appear above this field
 ## to quickly create a new action with sensible defaults.
-@export var action_down := 'ui_down'
+@export var action_down := &"ui_down"
 ## Name of the action in the [code]InputMap[/code] that should add an eastwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_right[/code] here instead of [code]ui_right[/code],
 ## reload the inspector, and use the button that should appear above this field
 ## to quickly create a new action with sensible defaults.
-@export var action_right := 'ui_right'
+@export var action_right := &"ui_right"
 ## Name of the action in the [code]InputMap[/code] that should add a westwards
 ## movement intent to this camera.
 ## [b]Tip[/b]: set [code]cam_left[/code] here instead of [code]ui_left[/code],
 ## reload the inspector, and use the button that should appear above this field
 ## to quickly create a new action with sensible defaults.
-@export var action_left := 'ui_left'
+@export var action_left := &"ui_left"
 ## Name of the action in the [code]InputMap[/code] that should add a movement
 ## intent inwards, towards the target of this camera.
-@export var action_zoom_in := 'cam_zoom_in'
+@export var action_zoom_in := &"cam_zoom_in"
 ## Name of the action in the [code]InputMap[/code] that should add a movement
 ## intent outwards, away from the target of this camera.
-@export var action_zoom_out := 'cam_zoom_out'
+@export var action_zoom_out := &"cam_zoom_out"
 ## Name of the action in the [code]InputMap[/code] that should temporarily free
 ## the horizon during activation.  (right mouse click works well)
 ## Useful only if [code]stabilize_horizon[/code] is set to [code]true[/code].
-@export var action_free_horizon := 'cam_free_horizon'
+@export var action_free_horizon := &"cam_free_horizon"
 ## Name of the action in the [code]InputMap[/code] that should enable the
 ## [i]barrel roll mode[/i] for the whole duration of its activation,
 ## mode in which movement intents are converted to roll rotations.
 ## The default, generated action uses the middle mouse button for this.
-@export var action_barrel_roll := 'cam_barrel_roll'
+@export var action_barrel_roll := &"cam_barrel_roll"
 
 
 @export_group("Orbit")
