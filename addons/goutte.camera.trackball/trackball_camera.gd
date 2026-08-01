@@ -11,7 +11,7 @@ extends Camera3D
 #    | | | | (_| | (__|   <| |_) | (_| | | | |___| (_| | | | | | | __/ | | (_| |
 #    |_|_|  \__,_|\___|_|\_\_.__/ \__,_|_|_|\_____\__,_|_| |_| |_|___|_|  \__,_|
 #
-# Version 9.2
+# Version 9.3
 #
 # Main Features
 # -------------
@@ -67,6 +67,22 @@ extends Camera3D
 ## Actions from the [code]InputMap[/code] using mouse buttons are unaffected by
 ## this setting.
 @export var mouse_enabled := true
+## Only mouse buttons that pass this mask will be considered.
+## By default, all mouse buttons (but the scroll) pass.
+@export_flags(
+	"Left:1",
+	"Right:2",
+	"Middle:4",
+	"Thumb 1:128",
+	"Thumb 2:256",
+)
+var mouse_button_mask := (
+	MOUSE_BUTTON_MASK_LEFT |
+	MOUSE_BUTTON_MASK_RIGHT |
+	MOUSE_BUTTON_MASK_MIDDLE |
+	MOUSE_BUTTON_MASK_MB_XBUTTON1 |
+	MOUSE_BUTTON_MASK_MB_XBUTTON2
+)
 ## Invert the intent of all the horizontal mouse movements.
 @export var mouse_invert_x := false
 ## Invert the intent of all the vertical mouse movements.
@@ -217,7 +233,7 @@ const PITCH_SOFT_LIMIT_NORMALIZATION := 0.005
 
 var _horizonUp := Vector3.UP
 var _cameraUp := Vector3.UP
-var _cameraRight := Vector3.RIGHT
+#var _cameraRight := Vector3.RIGHT
 var _mouseDragStart := ABSURD_VECTOR2
 var _mouseDragPosition := ABSURD_VECTOR2
 var _dragInertia := Vector2.ZERO
@@ -230,15 +246,15 @@ var _isZoomInActionAvailable := false
 var _isZoomOutActionAvailable := false
 
 
-func _ready():  # this allows overriding through inheritance
+func _ready():
 	ready()
 
 
-func _input(event: InputEvent):  # this allows overriding through inheritance
+func _input(event: InputEvent):
 	input(event)
 
 
-func _process(delta: float):  # this allows overriding through inheritance
+func _process(delta: float):
 	process(delta)
 
 
@@ -255,11 +271,12 @@ func input(event: InputEvent):
 
 func handle_mouse_input(event: InputEvent):
 	if (not mouse_move_mode) and (event is InputEventMouseButton):
-		if (event as InputEventMouseButton).pressed:
-			_mouseDragStart = get_mouse_position()
-		else:
-			_mouseDragStart = ABSURD_VECTOR2
-		_mouseDragPosition = _mouseDragStart
+		if (event as InputEventMouseButton).button_index & mouse_button_mask:
+			if (event as InputEventMouseButton).pressed:
+				_mouseDragStart = get_mouse_position()
+			else:
+				_mouseDragStart = ABSURD_VECTOR2
+			_mouseDragPosition = _mouseDragStart
 	if (mouse_move_mode) and (event is InputEventMouseMotion):
 		add_inertia(
 			(event as InputEventMouseMotion).relative *
@@ -277,7 +294,7 @@ func process(delta: float):
 	process_zoom_inertia(delta)
 
 
-func process_mouse(delta: float):
+func process_mouse(_delta: float):
 	if self.mouse_enabled and _mouseDragPosition != ABSURD_VECTOR2:
 		var _currentDragPosition := get_mouse_position()
 		var intent := _currentDragPosition - _mouseDragPosition
@@ -329,7 +346,7 @@ func process_actions(delta: float):
 			))
 
 
-func process_zoom(delta: float):
+func process_zoom(_delta: float):
 	if self.zoom_enabled:
 		var intent := self.zoom_strength * ZOOM_STRENGTH_NORMALIZATION
 		if should_zoom_in():
@@ -338,7 +355,7 @@ func process_zoom(delta: float):
 			add_zoom_inertia(intent * -1.0)
 
 
-func process_drag_inertia(delta: float):
+func process_drag_inertia(_delta: float):
 	var inertia := _dragInertia.length()
 	if inertia > self.inertia_threshold:
 		apply_rotation_from_tangent(_dragInertia * inertia_strength)
@@ -348,7 +365,7 @@ func process_drag_inertia(delta: float):
 		_dragInertia.y = 0
 
 
-func process_roll_inertia(delta: float):
+func process_roll_inertia(_delta: float):
 	#var roll_inertia_intensity : float = float(abs(_rollInertia) as float) as float
 	if abs(_rollInertia) > inertia_threshold:
 		apply_barrel_roll(_rollInertia * inertia_strength)
@@ -357,7 +374,7 @@ func process_roll_inertia(delta: float):
 		_rollInertia = 0
 
 
-func process_zoom_inertia(delta: float):
+func process_zoom_inertia(_delta: float):
 	# This whole function is … bouerk.  Please share your improvements!
 	var cpl := get_distance_to_target()
 	if abs(_zoomInertia) > zoom_inertia_threshold:
